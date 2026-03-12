@@ -21,19 +21,35 @@ namespace m0n0t0nysMod
         private const string PREF_PRESET1H       = "DisplayItemValue_Preset1H";
         private const string PREF_PRESET1M       = "DisplayItemValue_Preset1M";
         private const string PREF_PRESET2H       = "DisplayItemValue_Preset2H";
-        private const string PREF_PRESET2M       = "DisplayItemValue_Preset2M";
-        private const KeyCode MENU_KEY            = KeyCode.F9;
+        private const string PREF_PRESET2M        = "DisplayItemValue_Preset2M";
+        private const string PREF_ENEMY_NAMES     = "DisplayItemValue_EnemyNames";
+        private const KeyCode MENU_KEY             = KeyCode.F9;
 
         // ── Item value display ────────────────────────────────────────────
         private bool _showValue;
         private DisplayMode _mode;
         private TextMeshProUGUI? _valueText;
 
+        // ── Enemy name display ────────────────────────────────────────────
+        private bool _showEnemyNames;
+        private float _nameUpdateTimer;
+        private static readonly FieldInfo? _hbNameTextField =
+            typeof(HealthBar).GetField("nameText", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo? _characterPresetField =
+            typeof(CharacterMainControl).GetField("characterPreset", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo? _displayNameProp =
+            typeof(CharacterMainControl)
+                .GetField("characterPreset", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                ?.FieldType.GetProperty("DisplayName", BindingFlags.Public | BindingFlags.Instance);
+
         // ── Settings panel UI refs ────────────────────────────────────────
         private GameObject? _settingsCanvas;
         private Image? _toggleBtnImage;
         private TextMeshProUGUI? _toggleBtnText;
-        private TextMeshProUGUI? _modeBtnText;
+        private Image[]? _modeBtnImages;
+        private TextMeshProUGUI[]? _modeBtnLabels;
+        private Image? _enemyNamesToggleImage;
+        private TextMeshProUGUI? _enemyNamesToggleText;
         private Image? _sleepToggleImage;
         private TextMeshProUGUI? _sleepToggleText;
 
@@ -43,8 +59,6 @@ namespace m0n0t0nysMod
         private int  _preset2Hour, _preset2Min;
         private SleepView? _sleepViewInstance;
         private bool _sleepPresetsInjected;
-
-        // Live label refs so settings picker updates the in-sleep-view button text
         private TextMeshProUGUI? _preset1BtnLabel;
         private TextMeshProUGUI? _preset2BtnLabel;
 
@@ -60,9 +74,10 @@ namespace m0n0t0nysMod
 
         void Awake()
         {
-            _showValue           = PlayerPrefs.GetInt(PREF_ENABLED,      1)  == 1;
+            _showValue           = PlayerPrefs.GetInt(PREF_ENABLED,      1) == 1;
             _mode                = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
-            _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1)  == 1;
+            _showEnemyNames      = PlayerPrefs.GetInt(PREF_ENEMY_NAMES,  1) == 1;
+            _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1) == 1;
             _preset1Hour         = PlayerPrefs.GetInt(PREF_PRESET1H,  5);
             _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
             _preset2Hour         = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
@@ -96,6 +111,44 @@ namespace m0n0t0nysMod
 
             if (_sleepPresetsEnabled)
                 CheckSleepViewInjection();
+
+            if (_showEnemyNames)
+            {
+                _nameUpdateTimer -= Time.deltaTime;
+                if (_nameUpdateTimer <= 0f)
+                {
+                    _nameUpdateTimer = 0.15f;
+                    UpdateEnemyNameBars();
+                }
+            }
+        }
+
+        // ── Enemy Name Bars ───────────────────────────────────────────────
+
+        private void UpdateEnemyNameBars()
+        {
+            foreach (var hb in FindObjectsOfType<HealthBar>())
+            {
+                if (hb == null || !hb.gameObject.activeInHierarchy) continue;
+
+                var health = hb.target;
+                if (health == null) continue;
+
+                var character = health.TryGetCharacter();
+                if (character == null || character.IsMainCharacter) continue;
+
+                var preset = _characterPresetField?.GetValue(character);
+                if (preset == null) continue;
+
+                var displayName = _displayNameProp?.GetValue(preset) as string;
+                if (string.IsNullOrEmpty(displayName)) continue;
+
+                var nameTMP = _hbNameTextField?.GetValue(hb) as TextMeshProUGUI;
+                if (nameTMP == null) continue;
+
+                nameTMP.text = displayName;
+                nameTMP.gameObject.SetActive(true);
+            }
         }
 
         // ── Sleep Presets injection ───────────────────────────────────────
@@ -134,7 +187,6 @@ namespace m0n0t0nysMod
                 return;
             }
 
-            // Find the Sleep button by looking for one whose child TMP text contains "Sleep"
             Button? sleepBtn = null;
             foreach (var btn in sv.GetComponentsInChildren<Button>(true))
             {
@@ -161,7 +213,6 @@ namespace m0n0t0nysMod
             var origAnchoredPos = sleepRect.anchoredPosition;
             int origSiblingIdx  = sleepBtn.transform.GetSiblingIndex();
 
-            // Create wrapper that occupies exactly the same rect as the Sleep button did
             var wrapper = new GameObject("SleepPresetWrapper");
             wrapper.transform.SetParent(origParent, false);
             wrapper.transform.SetSiblingIndex(origSiblingIdx);
@@ -179,14 +230,12 @@ namespace m0n0t0nysMod
             hLayout.childForceExpandHeight = true;
             hLayout.padding               = new RectOffset(0, 0, 0, 0);
 
-            // Reparent the real Sleep button into the wrapper (left slot)
             sleepBtn.transform.SetParent(wrapper.transform, false);
             var sleepLE = sleepBtn.gameObject.GetComponent<LayoutElement>();
             if (sleepLE == null) sleepLE = sleepBtn.gameObject.AddComponent<LayoutElement>();
             sleepLE.preferredWidth = origSizeDelta.x * 0.32f;
             sleepLE.flexibleWidth  = 0f;
 
-            // Preset grid container — takes remaining width
             var presetGrid = new GameObject("PresetGrid");
             presetGrid.transform.SetParent(wrapper.transform, false);
             var gridLE = presetGrid.AddComponent<LayoutElement>();
@@ -197,13 +246,11 @@ namespace m0n0t0nysMod
             vLayout.childForceExpandWidth  = true;
             vLayout.childForceExpandHeight = true;
 
-            // Row 1: preset1, preset2, Rain
             var row1 = MakePresetRow(presetGrid);
             _preset1BtnLabel = AddGridBtn(row1, sv, $"{_preset1Hour:D2}:{_preset1Min:D2}", () => MinutesUntilTime(_preset1Hour, _preset1Min), sleepImg);
             _preset2BtnLabel = AddGridBtn(row1, sv, $"{_preset2Hour:D2}:{_preset2Min:D2}", () => MinutesUntilTime(_preset2Hour, _preset2Min), sleepImg);
             AddGridBtn(row1, sv, "Rain",      () => MinutesUntilRain(),    sleepImg);
 
-            // Row 2: Storm I, Storm II, Post-Storm
             var row2 = MakePresetRow(presetGrid);
             AddGridBtn(row2, sv, "Storm I",    () => MinutesUntilStorm(1),   sleepImg);
             AddGridBtn(row2, sv, "Storm II",   () => MinutesUntilStorm(2),   sleepImg);
@@ -256,7 +303,6 @@ namespace m0n0t0nysMod
             tmp.fontSizeMax      = 20f;
             tmp.alignment        = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = false;
-            // Copy font, style and color from the Sleep button's own text
             var sleepTxt = styleSource?.GetComponentInChildren<TextMeshProUGUI>(true);
             if (sleepTxt != null)
             {
@@ -330,7 +376,7 @@ namespace m0n0t0nysMod
 
         private void BuildSettingsPanel()
         {
-            _settingsCanvas = new GameObject("DisplayItemValue_Canvas");
+            _settingsCanvas = new GameObject("m0n0t0nysMod_Canvas");
             DontDestroyOnLoad(_settingsCanvas);
             var canvas = _settingsCanvas.AddComponent<Canvas>();
             canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
@@ -338,66 +384,106 @@ namespace m0n0t0nysMod
             _settingsCanvas.AddComponent<CanvasScaler>();
             _settingsCanvas.AddComponent<GraphicRaycaster>();
 
-            var border = MakeImage(_settingsCanvas, "Border", new Color(0f, 0.78f, 0.52f, 0.22f));
-            SetRect(border, 0, 0, 328, 386);
-            var panel = MakeImage(_settingsCanvas, "Panel", new Color(0.067f, 0.071f, 0.082f, 0.97f));
-            SetRect(panel, 0, 0, 320, 380);
+            // Panel — auto-sizes vertically, fixed 360px wide, centered
+            var panel = new GameObject("Panel");
+            panel.transform.SetParent(_settingsCanvas.transform, false);
+            var panelRect = panel.AddComponent<RectTransform>();
+            panelRect.anchorMin = panelRect.anchorMax = panelRect.pivot = new Vector2(0.5f, 0.5f);
+            panelRect.anchoredPosition = Vector2.zero;
+            panelRect.sizeDelta = new Vector2(360f, 0f);
+            panel.AddComponent<Image>().color = new Color(0.063f, 0.065f, 0.080f, 0.97f);
+            var panelVLG = panel.AddComponent<VerticalLayoutGroup>();
+            panelVLG.childAlignment       = TextAnchor.UpperCenter;
+            panelVLG.childForceExpandWidth  = true;
+            panelVLG.childForceExpandHeight = false;
+            panelVLG.spacing = 0f;
+            panelVLG.padding = new RectOffset(0, 0, 0, 0);
+            panel.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            // Header
-            var header = MakeImage(panel, "Header", new Color(0.10f, 0.11f, 0.14f, 1f));
-            SetRect(header, 0, 168, 320, 44);
-            var accent = MakeImage(panel, "Accent", new Color(0f, 0.78f, 0.52f, 1f));
-            SetRect(accent, 0, 146, 320, 2);
-            var title = MakeText(panel, "Title", "m0n0t0ny's mod", 15);
-            title.GetComponent<TextMeshProUGUI>().color = Color.white;
-            SetRect(title, -20, 168, 240, 28);
-            var ver = MakeText(panel, "Ver", "v1.0", 9);
-            ver.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
-            SetRect(ver, 120, 168, 60, 28);
+            // ── Header ────────────────────────────────────────────────────
+            var header = LChild(panel, "Header", 50f);
+            header.GetComponent<Image>().color = new Color(0.10f, 0.11f, 0.145f, 1f);
+            var hHLG = header.AddComponent<HorizontalLayoutGroup>();
+            hHLG.padding              = new RectOffset(16, 16, 0, 0);
+            hHLG.childAlignment       = TextAnchor.MiddleLeft;
+            hHLG.childForceExpandHeight = true;
+            hHLG.childForceExpandWidth  = false;
+            hHLG.spacing = 0f;
+            var titleGo = LText(header, "Title", "m0n0t0ny's mod", 17f, flexW: 1f);
+            var titleTMP = titleGo.GetComponent<TextMeshProUGUI>();
+            titleTMP.color = Color.white;
+            titleTMP.fontStyle = FontStyles.Bold;
+            titleTMP.alignment = TextAlignmentOptions.Left;
+            var verGo = LText(header, "Ver", "v1.0", 10f, prefW: 44f);
+            verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
+            verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
-            // ── Item Value ────────────────────────────────────────────
-            var toggleBtn = MakeImage(panel, "ToggleBtn", Color.gray);
-            SetRect(toggleBtn, 0, 110, 284, 36);
-            _toggleBtnImage = toggleBtn.GetComponent<Image>();
-            var toggleBtnText = MakeText(toggleBtn, "Label", "", 13);
-            StretchRect(toggleBtnText);
-            _toggleBtnText = toggleBtnText.GetComponent<TextMeshProUGUI>();
-            toggleBtn.AddComponent<Button>().onClick.AddListener(OnToggleClicked);
+            // ── Teal accent line ──────────────────────────────────────────
+            var accent = LChild(panel, "Accent", 2f);
+            accent.GetComponent<Image>().color = new Color(0f, 0.78f, 0.52f, 1f);
+
+            LGap(panel, 10f);
+
+            // ── Section 1: Item Value ─────────────────────────────────────
+            var s1 = LSectionCard(panel);
+
+            LLabel(s1, "ITEM VALUE", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s1);
+
+            var (tRow, tImg, tTMP) = LToggleRow(s1, "Show sell value on hover");
+            _toggleBtnImage = tImg;
+            _toggleBtnText  = tTMP;
+            tRow.GetComponentInChildren<Button>().onClick.AddListener(OnToggleClicked);
             RefreshToggleButton();
 
-            MakeSep(panel, 76, "DISPLAY MODE");
+            LLabel(s1, "Display Mode", 10f, new Color(0.48f, 0.48f, 0.58f, 1f));
 
-            var modeBtn = MakeImage(panel, "ModeBtn", new Color(0.13f, 0.20f, 0.35f, 1f));
-            SetRect(modeBtn, 0, 44, 284, 36);
-            var modeBtnText = MakeText(modeBtn, "Label", "", 12);
-            StretchRect(modeBtnText);
-            _modeBtnText = modeBtnText.GetComponent<TextMeshProUGUI>();
-            modeBtn.AddComponent<Button>().onClick.AddListener(OnModeCycleClicked);
-            RefreshModeButton();
+            var modeRow = LChild(s1, "ModeRow", 34f);
+            modeRow.GetComponent<Image>().color = Color.clear;
+            var mHLG = modeRow.AddComponent<HorizontalLayoutGroup>();
+            mHLG.spacing               = 5f;
+            mHLG.childForceExpandWidth  = true;
+            mHLG.childForceExpandHeight = true;
 
-            // ── Sleep Presets ─────────────────────────────────────────
-            MakeSep(panel, 12, "SLEEP PRESETS");
+            var (btnS, imgS, lblS) = LModeBtn(modeRow, "Single");
+            var (btnC, imgC, lblC) = LModeBtn(modeRow, "Combined");
+            var (btnT, imgT, lblT) = LModeBtn(modeRow, "Stack");
+            _modeBtnImages = new[] { imgS, imgC, imgT };
+            _modeBtnLabels = new[] { lblS, lblC, lblT };
+            btnS.onClick.AddListener(() => SetMode(DisplayMode.SingleOnly));
+            btnC.onClick.AddListener(() => SetMode(DisplayMode.Combined));
+            btnT.onClick.AddListener(() => SetMode(DisplayMode.StackOnly));
+            RefreshModeButtons();
 
-            var sleepToggle = MakeImage(panel, "SleepToggle", Color.gray);
-            SetRect(sleepToggle, 0, -18, 284, 32);
-            _sleepToggleImage = sleepToggle.GetComponent<Image>();
-            var sleepToggleTxt = MakeText(sleepToggle, "Label", "", 12);
-            StretchRect(sleepToggleTxt);
-            _sleepToggleText = sleepToggleTxt.GetComponent<TextMeshProUGUI>();
-            sleepToggle.AddComponent<Button>().onClick.AddListener(OnSleepToggleClicked);
+            LGap(panel, 8f);
+
+            // ── Section 2: Enemy Names ────────────────────────────────────
+            var s2 = LSectionCard(panel);
+
+            LLabel(s2, "ENEMIES", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s2);
+
+            var (enRow, enImg, enTMP) = LToggleRow(s2, "Show enemy names above health bar");
+            _enemyNamesToggleImage = enImg;
+            _enemyNamesToggleText  = enTMP;
+            enRow.GetComponentInChildren<Button>().onClick.AddListener(OnEnemyNamesToggleClicked);
+            RefreshEnemyNamesToggle();
+
+            LGap(panel, 8f);
+
+            // ── Section 3: Sleep Presets ──────────────────────────────────
+            var s3 = LSectionCard(panel);
+
+            LLabel(s3, "SLEEP PRESETS", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s3);
+
+            var (stRow, stImg, stTMP) = LToggleRow(s3, "Wake-up preset buttons");
+            _sleepToggleImage = stImg;
+            _sleepToggleText  = stTMP;
+            stRow.GetComponentInChildren<Button>().onClick.AddListener(OnSleepToggleClicked);
             RefreshSleepToggle();
 
-            // Preset 1
-            MakeLineSep(panel, -46);
-            var p1Label = MakeText(panel, "P1Label", "Preset 1  (time of day)", 8);
-            p1Label.GetComponent<TextMeshProUGUI>().color = new Color(0.4f, 0.4f, 0.5f, 1f);
-            SetRect(p1Label, 0, -53, 284, 14);
-
-            var picker1 = new GameObject("Picker1");
-            picker1.transform.SetParent(panel.transform, false);
-            picker1.AddComponent<RectTransform>();
-            SetRect(picker1, 0, -76, 284, 28);
-            BuildTimePicker(picker1,
+            LPickerRow(s3, "Preset 1",
                 () => _preset1Hour,
                 v => { _preset1Hour = v; PlayerPrefs.SetInt(PREF_PRESET1H, v); PlayerPrefs.Save();
                        if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; },
@@ -405,17 +491,7 @@ namespace m0n0t0nysMod
                 v => { _preset1Min  = v; PlayerPrefs.SetInt(PREF_PRESET1M, v); PlayerPrefs.Save();
                        if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; });
 
-            // Preset 2
-            MakeLineSep(panel, -96);
-            var p2Label = MakeText(panel, "P2Label", "Preset 2  (time of day)", 8);
-            p2Label.GetComponent<TextMeshProUGUI>().color = new Color(0.4f, 0.4f, 0.5f, 1f);
-            SetRect(p2Label, 0, -103, 284, 14);
-
-            var picker2 = new GameObject("Picker2");
-            picker2.transform.SetParent(panel.transform, false);
-            picker2.AddComponent<RectTransform>();
-            SetRect(picker2, 0, -126, 284, 28);
-            BuildTimePicker(picker2,
+            LPickerRow(s3, "Preset 2",
                 () => _preset2Hour,
                 v => { _preset2Hour = v; PlayerPrefs.SetInt(PREF_PRESET2H, v); PlayerPrefs.Save();
                        if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; },
@@ -423,120 +499,215 @@ namespace m0n0t0nysMod
                 v => { _preset2Min  = v; PlayerPrefs.SetInt(PREF_PRESET2M, v); PlayerPrefs.Save();
                        if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; });
 
-            // ── Close ────────────────────────────────────────────────
-            MakeLineSep(panel, -148);
-            var closeBtn = MakeImage(panel, "CloseBtn", new Color(0.48f, 0.09f, 0.09f, 1f));
-            SetRect(closeBtn, 0, -168, 140, 28);
-            var closeTxt = MakeText(closeBtn, "Label", $"Close  [{MENU_KEY}]", 11);
-            StretchRect(closeTxt);
-            closeBtn.AddComponent<Button>().onClick.AddListener(() => _settingsCanvas!.SetActive(false));
-            var hint = MakeText(panel, "Hint", $"[{MENU_KEY}] to open / close", 9);
-            hint.GetComponent<TextMeshProUGUI>().color = new Color(0.35f, 0.35f, 0.4f, 1f);
-            SetRect(hint, 0, -182, 284, 14);
+            LGap(panel, 10f);
+
+            // ── Bottom bar ────────────────────────────────────────────────
+            var bottom = LChild(panel, "Bottom", 46f);
+            bottom.GetComponent<Image>().color = new Color(0.075f, 0.078f, 0.095f, 1f);
+            var bHLG = bottom.AddComponent<HorizontalLayoutGroup>();
+            bHLG.padding              = new RectOffset(14, 14, 8, 8);
+            bHLG.spacing              = 10f;
+            bHLG.childForceExpandHeight = true;
+            bHLG.childForceExpandWidth  = false;
+
+            var closeGo = new GameObject("CloseBtn");
+            closeGo.transform.SetParent(bottom.transform, false);
+            closeGo.AddComponent<RectTransform>();
+            var closeImg = closeGo.AddComponent<Image>();
+            closeImg.color = new Color(0.46f, 0.08f, 0.08f, 1f);
+            closeGo.AddComponent<LayoutElement>().preferredWidth = 110f;
+            closeGo.AddComponent<Button>().onClick.AddListener(() => _settingsCanvas!.SetActive(false));
+            var cTxtGo = new GameObject("T");
+            cTxtGo.transform.SetParent(closeGo.transform, false);
+            var cTMP = cTxtGo.AddComponent<TextMeshProUGUI>();
+            cTMP.text = $"Close  [{MENU_KEY}]"; cTMP.fontSize = 12f;
+            cTMP.alignment = TextAlignmentOptions.Center; cTMP.color = Color.white;
+            var cTr = cTxtGo.GetComponent<RectTransform>();
+            cTr.anchorMin = Vector2.zero; cTr.anchorMax = Vector2.one;
+            cTr.sizeDelta = Vector2.zero; cTr.anchoredPosition = Vector2.zero;
+
+            var hintGo = LText(bottom, "Hint", $"[{MENU_KEY}]  open / close", 9f, flexW: 1f);
+            var hintTMP = hintGo.GetComponent<TextMeshProUGUI>();
+            hintTMP.color = new Color(0.28f, 0.28f, 0.35f, 1f);
+            hintTMP.alignment = TextAlignmentOptions.Right;
 
             _settingsCanvas.SetActive(false);
         }
 
-        // Builds [ − ] [ HH ] [ + ] : [ − ] [ MM ] [ + ]
-        private static void BuildTimePicker(
-            GameObject parent,
-            Func<int> getH, Action<int> setH,
-            Func<int> getM, Action<int> setM)
+        // ── Layout helpers ────────────────────────────────────────────────
+
+        // Fixed-height child with Image (clear by default)
+        private static GameObject LChild(GameObject parent, string name, float h)
         {
-            var layout = parent.AddComponent<HorizontalLayoutGroup>();
-            layout.childAlignment        = TextAnchor.MiddleCenter;
-            layout.childForceExpandWidth  = false;
-            layout.childForceExpandHeight = true;
-            layout.spacing = 3;
-
-            var hMinus   = MakePickerBtn(parent, "−");
-            var hDisplay = MakePickerDisplay(parent, $"{getH():D2}");
-            var hPlus    = MakePickerBtn(parent, "+");
-            var colon    = MakePickerColon(parent);
-            var mMinus   = MakePickerBtn(parent, "−");
-            var mDisplay = MakePickerDisplay(parent, $"{getM():D2}");
-            var mPlus    = MakePickerBtn(parent, "+");
-
-            var hTxt = hDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
-            var mTxt = mDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
-
-            hMinus.GetComponent<Button>().onClick.AddListener(() => { setH(((getH()-1)+24)%24); hTxt.text=$"{getH():D2}"; });
-            hPlus.GetComponent<Button>().onClick.AddListener(()  => { setH((getH()+1)%24);      hTxt.text=$"{getH():D2}"; });
-            mMinus.GetComponent<Button>().onClick.AddListener(() => { setM(((getM()-10)+60)%60); mTxt.text=$"{getM():D2}"; });
-            mPlus.GetComponent<Button>().onClick.AddListener(()  => { setM((getM()+10)%60);     mTxt.text=$"{getM():D2}"; });
-        }
-
-        private static GameObject MakePickerBtn(GameObject parent, string label)
-        {
-            var go = new GameObject($"Btn{label}");
+            var go = new GameObject(name);
             go.transform.SetParent(parent.transform, false);
-            var r = go.AddComponent<RectTransform>();
-            r.sizeDelta = new Vector2(24, 28);
-            var img = go.AddComponent<Image>();
-            img.color = new Color(0.18f, 0.28f, 0.45f, 1f);
-            var btn = go.AddComponent<Button>();
-            var c   = btn.colors;
-            c.highlightedColor = new Color(0.26f, 0.42f, 0.65f, 1f);
-            c.pressedColor     = new Color(0.10f, 0.16f, 0.28f, 1f);
-            btn.colors = c;
-            var t = new GameObject("T");
-            t.transform.SetParent(go.transform, false);
-            var tmp = t.AddComponent<TextMeshProUGUI>();
-            tmp.text = label; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            var tr = t.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-            go.AddComponent<LayoutElement>().preferredWidth = 24;
+            go.AddComponent<RectTransform>();
+            go.AddComponent<Image>().color = Color.clear;
+            go.AddComponent<LayoutElement>().preferredHeight = h;
             return go;
         }
 
-        private static GameObject MakePickerDisplay(GameObject parent, string text)
+        // Invisible gap
+        private static void LGap(GameObject parent, float h)
         {
-            var go = new GameObject("Disp");
+            var go = new GameObject("Gap");
             go.transform.SetParent(parent.transform, false);
-            var r = go.AddComponent<RectTransform>();
-            r.sizeDelta = new Vector2(36, 28);
-            var img = go.AddComponent<Image>();
-            img.color = new Color(0.05f, 0.05f, 0.08f, 1f);
-            var t = new GameObject("T");
-            t.transform.SetParent(go.transform, false);
-            var tmp = t.AddComponent<TextMeshProUGUI>();
-            tmp.text = text; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            var tr = t.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-            go.AddComponent<LayoutElement>().preferredWidth = 36;
+            go.AddComponent<RectTransform>();
+            go.AddComponent<LayoutElement>().preferredHeight = h;
+        }
+
+        // Section card — dark bg, auto-height VLG
+        private static GameObject LSectionCard(GameObject parent)
+        {
+            var go = new GameObject("Section");
+            go.transform.SetParent(parent.transform, false);
+            go.AddComponent<RectTransform>();
+            go.AddComponent<Image>().color = new Color(0.090f, 0.095f, 0.118f, 1f);
+            var vlg = go.AddComponent<VerticalLayoutGroup>();
+            vlg.padding             = new RectOffset(14, 14, 10, 12);
+            vlg.spacing             = 7f;
+            vlg.childForceExpandWidth  = true;
+            vlg.childForceExpandHeight = false;
+            go.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             return go;
         }
 
-        private static GameObject MakePickerColon(GameObject parent)
+        // Text GO inside a layout group (optional preferred/flexible widths)
+        private static GameObject LText(GameObject parent, string name, string text, float size,
+            float prefW = -1f, float flexW = -1f)
         {
-            var go = new GameObject("Colon");
+            var go = new GameObject(name);
             go.transform.SetParent(parent.transform, false);
-            var r = go.AddComponent<RectTransform>();
-            r.sizeDelta = new Vector2(12, 28);
+            go.AddComponent<RectTransform>();
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = ":"; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = new Color(0.6f, 0.6f, 0.7f, 1f);
-            go.AddComponent<LayoutElement>().preferredWidth = 12;
+            tmp.text = text; tmp.fontSize = size;
+            if (prefW >= 0 || flexW >= 0)
+            {
+                var le = go.AddComponent<LayoutElement>();
+                if (prefW >= 0) le.preferredWidth = prefW;
+                if (flexW >= 0) le.flexibleWidth  = flexW;
+            }
             return go;
         }
 
-        private void MakeSep(GameObject parent, float y, string label)
+        // Small section label
+        private static void LLabel(GameObject parent, string text, float size, Color color)
         {
-            MakeLineSep(parent, y + 8);
-            var lbl = MakeText(parent, $"SepLbl_{label}", label, 8);
-            lbl.GetComponent<TextMeshProUGUI>().color = new Color(0.4f, 0.4f, 0.5f, 1f);
-            SetRect(lbl, 0, y, 284, 14);
+            var go = new GameObject("Label");
+            go.transform.SetParent(parent.transform, false);
+            go.AddComponent<RectTransform>();
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.text = text; tmp.fontSize = size;
+            tmp.color = color; tmp.fontStyle = FontStyles.Bold;
+            tmp.alignment = TextAlignmentOptions.Left;
+            go.AddComponent<LayoutElement>().preferredHeight = 14f;
         }
 
-        private static void MakeLineSep(GameObject parent, float y)
+        // 1px divider line
+        private static void LDivider(GameObject parent)
         {
-            var line = new GameObject("Line");
-            line.transform.SetParent(parent.transform, false);
-            line.AddComponent<RectTransform>();
-            line.AddComponent<Image>().color = new Color(0.22f, 0.22f, 0.27f, 1f);
-            SetRect(line, 0, y, 284, 1);
+            var go = new GameObject("Divider");
+            go.transform.SetParent(parent.transform, false);
+            go.AddComponent<RectTransform>();
+            go.AddComponent<Image>().color = new Color(0.20f, 0.22f, 0.28f, 1f);
+            go.AddComponent<LayoutElement>().preferredHeight = 1f;
+        }
+
+        // Row: [label ──────────────────────] [ ON ]
+        private static (GameObject row, Image pillImg, TextMeshProUGUI pillTMP)
+            LToggleRow(GameObject parent, string labelText)
+        {
+            var row = new GameObject("ToggleRow");
+            row.transform.SetParent(parent.transform, false);
+            row.AddComponent<RectTransform>();
+            row.AddComponent<Image>().color = Color.clear;
+            var hlg = row.AddComponent<HorizontalLayoutGroup>();
+            hlg.childAlignment       = TextAnchor.MiddleLeft;
+            hlg.childForceExpandHeight = true;
+            hlg.childForceExpandWidth  = false;
+            hlg.spacing = 10f;
+            row.AddComponent<LayoutElement>().preferredHeight = 34f;
+
+            var lbl = new GameObject("Label");
+            lbl.transform.SetParent(row.transform, false);
+            lbl.AddComponent<RectTransform>();
+            var lblTMP = lbl.AddComponent<TextMeshProUGUI>();
+            lblTMP.text = labelText; lblTMP.fontSize = 12f;
+            lblTMP.alignment = TextAlignmentOptions.Left;
+            lblTMP.color = new Color(0.82f, 0.82f, 0.88f, 1f);
+            lbl.AddComponent<LayoutElement>().flexibleWidth = 1f;
+
+            var pill = new GameObject("Pill");
+            pill.transform.SetParent(row.transform, false);
+            pill.AddComponent<RectTransform>();
+            var pillImg = pill.AddComponent<Image>();
+            var pillBtn = pill.AddComponent<Button>();
+            pillBtn.targetGraphic = pillImg;
+            pill.AddComponent<LayoutElement>().preferredWidth = 54f;
+
+            var pt = new GameObject("T");
+            pt.transform.SetParent(pill.transform, false);
+            var ptTMP = pt.AddComponent<TextMeshProUGUI>();
+            ptTMP.fontSize = 12f; ptTMP.fontStyle = FontStyles.Bold;
+            ptTMP.alignment = TextAlignmentOptions.Center;
+            var ptr = pt.GetComponent<RectTransform>();
+            ptr.anchorMin = Vector2.zero; ptr.anchorMax = Vector2.one;
+            ptr.sizeDelta = Vector2.zero; ptr.anchoredPosition = Vector2.zero;
+
+            return (row, pillImg, ptTMP);
+        }
+
+        // One of the 3 mode buttons
+        private static (Button btn, Image img, TextMeshProUGUI lbl)
+            LModeBtn(GameObject parent, string label)
+        {
+            var go = new GameObject($"Mode_{label}");
+            go.transform.SetParent(parent.transform, false);
+            go.AddComponent<RectTransform>();
+            var img = go.AddComponent<Image>();
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
+
+            var t = new GameObject("T");
+            t.transform.SetParent(go.transform, false);
+            var tmp = t.AddComponent<TextMeshProUGUI>();
+            tmp.text = label; tmp.fontSize = 11f; tmp.alignment = TextAlignmentOptions.Center;
+            var tr = t.GetComponent<RectTransform>();
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+
+            return (btn, img, tmp);
+        }
+
+        // Row: [Preset N]  [−][HH][+] : [−][MM][+]
+        private static void LPickerRow(GameObject parent, string label,
+            Func<int> getH, Action<int> setH, Func<int> getM, Action<int> setM)
+        {
+            var row = new GameObject($"PickerRow_{label}");
+            row.transform.SetParent(parent.transform, false);
+            row.AddComponent<RectTransform>();
+            row.AddComponent<Image>().color = Color.clear;
+            var hlg = row.AddComponent<HorizontalLayoutGroup>();
+            hlg.childAlignment       = TextAnchor.MiddleLeft;
+            hlg.childForceExpandHeight = true;
+            hlg.childForceExpandWidth  = false;
+            hlg.spacing = 10f;
+            row.AddComponent<LayoutElement>().preferredHeight = 32f;
+
+            var lbl = new GameObject("Label");
+            lbl.transform.SetParent(row.transform, false);
+            lbl.AddComponent<RectTransform>();
+            var lblTMP = lbl.AddComponent<TextMeshProUGUI>();
+            lblTMP.text = label; lblTMP.fontSize = 11f;
+            lblTMP.alignment = TextAlignmentOptions.Left;
+            lblTMP.color = new Color(0.52f, 0.52f, 0.62f, 1f);
+            lbl.AddComponent<LayoutElement>().preferredWidth = 58f;
+
+            var picker = new GameObject("Picker");
+            picker.transform.SetParent(row.transform, false);
+            picker.AddComponent<RectTransform>();
+            picker.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            BuildTimePicker(picker, getH, setH, getM, setM);
         }
 
         // ── Settings callbacks ────────────────────────────────────────────
@@ -549,12 +720,12 @@ namespace m0n0t0nysMod
             RefreshToggleButton();
         }
 
-        private void OnModeCycleClicked()
+        private void SetMode(DisplayMode mode)
         {
-            _mode = _mode == DisplayMode.StackOnly ? DisplayMode.Combined : _mode + 1;
+            _mode = mode;
             PlayerPrefs.SetInt(PREF_MODE, (int)_mode);
             PlayerPrefs.Save();
-            RefreshModeButton();
+            RefreshModeButtons();
         }
 
         private void OnSleepToggleClicked()
@@ -568,29 +739,52 @@ namespace m0n0t0nysMod
         private void RefreshToggleButton()
         {
             _toggleBtnImage!.color = _showValue
-                ? new Color(0.15f, 0.55f, 0.15f, 1f)
-                : new Color(0.55f, 0.15f, 0.15f, 1f);
-            _toggleBtnText!.text = _showValue ? "Item Value Display: ON" : "Item Value Display: OFF";
+                ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                : new Color(0.48f, 0.10f, 0.10f, 1f);
+            _toggleBtnText!.text  = _showValue ? "ON" : "OFF";
+            _toggleBtnText!.color = Color.white;
         }
 
-        private void RefreshModeButton()
+        private void RefreshModeButtons()
         {
-            _modeBtnText!.text = _mode switch
+            var modes = new[] { DisplayMode.SingleOnly, DisplayMode.Combined, DisplayMode.StackOnly };
+            for (int i = 0; i < 3; i++)
             {
-                DisplayMode.SingleOnly => "Single item value only",
-                DisplayMode.StackOnly  => "Stack total value only",
-                _                      => "Combined  (single / stack)",
-            };
+                bool active = modes[i] == _mode;
+                _modeBtnImages![i].color = active
+                    ? new Color(0.04f, 0.42f, 0.28f, 1f)
+                    : new Color(0.11f, 0.115f, 0.15f, 1f);
+                _modeBtnLabels![i].color = active
+                    ? Color.white
+                    : new Color(0.40f, 0.40f, 0.50f, 1f);
+                _modeBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
+            }
         }
 
         private void RefreshSleepToggle()
         {
             _sleepToggleImage!.color = _sleepPresetsEnabled
-                ? new Color(0.15f, 0.55f, 0.15f, 1f)
-                : new Color(0.55f, 0.15f, 0.15f, 1f);
-            _sleepToggleText!.text = _sleepPresetsEnabled
-                ? "Sleep Presets: ON"
-                : "Sleep Presets: OFF";
+                ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                : new Color(0.48f, 0.10f, 0.10f, 1f);
+            _sleepToggleText!.text  = _sleepPresetsEnabled ? "ON" : "OFF";
+            _sleepToggleText!.color = Color.white;
+        }
+
+        private void OnEnemyNamesToggleClicked()
+        {
+            _showEnemyNames = !_showEnemyNames;
+            PlayerPrefs.SetInt(PREF_ENEMY_NAMES, _showEnemyNames ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshEnemyNamesToggle();
+        }
+
+        private void RefreshEnemyNamesToggle()
+        {
+            _enemyNamesToggleImage!.color = _showEnemyNames
+                ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                : new Color(0.48f, 0.10f, 0.10f, 1f);
+            _enemyNamesToggleText!.text  = _showEnemyNames ? "ON" : "OFF";
+            _enemyNamesToggleText!.color = Color.white;
         }
 
         // ── Item Hover UI ─────────────────────────────────────────────────
@@ -624,39 +818,88 @@ namespace m0n0t0nysMod
             ValueText.fontSize = 20f;
         }
 
-        // ── UI Helpers ────────────────────────────────────────────────────
+        // ── Time Picker ───────────────────────────────────────────────────
 
-        private static GameObject MakeImage(GameObject parent, string name, Color color)
+        private static void BuildTimePicker(
+            GameObject parent,
+            Func<int> getH, Action<int> setH,
+            Func<int> getM, Action<int> setM)
         {
-            var go = new GameObject(name);
+            var layout = parent.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment       = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth  = false;
+            layout.childForceExpandHeight = true;
+            layout.spacing = 3;
+
+            var hMinus   = MakePickerBtn(parent, "−");
+            var hDisplay = MakePickerDisplay(parent, $"{getH():D2}");
+            var hPlus    = MakePickerBtn(parent, "+");
+            var colon    = MakePickerColon(parent);
+            var mMinus   = MakePickerBtn(parent, "−");
+            var mDisplay = MakePickerDisplay(parent, $"{getM():D2}");
+            var mPlus    = MakePickerBtn(parent, "+");
+
+            var hTxt = hDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
+            var mTxt = mDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
+
+            hMinus.GetComponent<Button>().onClick.AddListener(() => { setH(((getH()-1)+24)%24); hTxt.text=$"{getH():D2}"; });
+            hPlus.GetComponent<Button>().onClick.AddListener(()  => { setH((getH()+1)%24);      hTxt.text=$"{getH():D2}"; });
+            mMinus.GetComponent<Button>().onClick.AddListener(() => { setM(((getM()-10)+60)%60); mTxt.text=$"{getM():D2}"; });
+            mPlus.GetComponent<Button>().onClick.AddListener(()  => { setM((getM()+10)%60);     mTxt.text=$"{getM():D2}"; });
+        }
+
+        private static GameObject MakePickerBtn(GameObject parent, string label)
+        {
+            var go = new GameObject($"Btn{label}");
             go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<Image>().color = color;
+            var r = go.AddComponent<RectTransform>();
+            r.sizeDelta = new Vector2(24, 28);
+            var img = go.AddComponent<Image>();
+            img.color = new Color(0.16f, 0.22f, 0.38f, 1f);
+            var btn = go.AddComponent<Button>();
+            var c   = btn.colors;
+            c.highlightedColor = new Color(0.24f, 0.36f, 0.58f, 1f);
+            c.pressedColor     = new Color(0.08f, 0.12f, 0.22f, 1f);
+            btn.colors = c;
+            var t = new GameObject("T");
+            t.transform.SetParent(go.transform, false);
+            var tmp = t.AddComponent<TextMeshProUGUI>();
+            tmp.text = label; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
+            var tr = t.GetComponent<RectTransform>();
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+            go.AddComponent<LayoutElement>().preferredWidth = 24;
             return go;
         }
 
-        private static GameObject MakeText(GameObject parent, string name, string text, float size)
+        private static GameObject MakePickerDisplay(GameObject parent, string text)
         {
-            var go = new GameObject(name);
+            var go = new GameObject("Disp");
+            go.transform.SetParent(parent.transform, false);
+            var r = go.AddComponent<RectTransform>();
+            r.sizeDelta = new Vector2(36, 28);
+            go.AddComponent<Image>().color = new Color(0.06f, 0.065f, 0.085f, 1f);
+            var t = new GameObject("T");
+            t.transform.SetParent(go.transform, false);
+            var tmp = t.AddComponent<TextMeshProUGUI>();
+            tmp.text = text; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
+            var tr = t.GetComponent<RectTransform>();
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+            go.AddComponent<LayoutElement>().preferredWidth = 36;
+            return go;
+        }
+
+        private static GameObject MakePickerColon(GameObject parent)
+        {
+            var go = new GameObject("Colon");
             go.transform.SetParent(parent.transform, false);
             go.AddComponent<RectTransform>();
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = text; tmp.fontSize = size; tmp.alignment = TextAlignmentOptions.Center;
+            tmp.text = ":"; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
+            tmp.color = new Color(0.5f, 0.5f, 0.6f, 1f);
+            go.AddComponent<LayoutElement>().preferredWidth = 12;
             return go;
-        }
-
-        private static void SetRect(GameObject go, float x, float y, float w, float h)
-        {
-            var r = go.GetComponent<RectTransform>();
-            r.anchoredPosition = new Vector2(x, y);
-            r.sizeDelta        = new Vector2(w, h);
-        }
-
-        private static void StretchRect(GameObject go)
-        {
-            var r = go.GetComponent<RectTransform>();
-            r.anchorMin = Vector2.zero; r.anchorMax = Vector2.one;
-            r.sizeDelta = Vector2.zero; r.anchoredPosition = Vector2.zero;
         }
     }
 }
