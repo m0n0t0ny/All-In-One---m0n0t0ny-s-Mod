@@ -26,6 +26,10 @@ namespace m0n0t0nysMod
         private const string PREF_ENEMY_NAMES       = "DisplayItemValue_EnemyNames";
         private const string PREF_TRANSFER_ENABLED  = "DisplayItemValue_TransferEnabled";
         private const string PREF_TRANSFER_MOD      = "DisplayItemValue_TransferMod";
+        private const string PREF_AC_WASD            = "DisplayItemValue_ACWasd";
+        private const string PREF_AC_SHIFT           = "DisplayItemValue_ACShift";
+        private const string PREF_AC_SPACE           = "DisplayItemValue_ACSpace";
+        private const string PREF_AC_DAMAGE          = "DisplayItemValue_ACDamage";
         private const KeyCode MENU_KEY               = KeyCode.F9;
 
         // ── Item value display ────────────────────────────────────────────
@@ -42,12 +46,25 @@ namespace m0n0t0nysMod
         private TextMeshProUGUI? _transferToggleText;
         private Image[]? _transferModBtnImages;
         private TextMeshProUGUI[]? _transferModBtnLabels;
+        private GameObject? _shiftConflictWarning;
         private static readonly FieldInfo? _lootCharInvField =
             typeof(LootView).GetField("characterInventoryDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo? _lootTargetInvField =
             typeof(LootView).GetField("lootTargetInventoryDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly PropertyInfo? _invDisplayTargetProp =
             typeof(InventoryDisplay).GetProperty("Target", BindingFlags.Public | BindingFlags.Instance);
+
+        // ── Auto-close container ──────────────────────────────────────────
+        private bool _autoCloseOnWASD;
+        private bool _autoCloseOnShift;
+        private bool _autoCloseOnSpace;
+        private bool _autoCloseOnDamage;
+        private Image[]? _autoCloseBtnImages;
+        private TextMeshProUGUI[]? _autoCloseBtnTexts;
+        private Component? _playerHealthComp;
+        private PropertyInfo? _playerHealthValueProp;
+        private float _playerHealthPrev = float.MaxValue;
+        private float _damageInitTimer;
 
         // ── Enemy name display ────────────────────────────────────────────
         private bool _showEnemyNames;
@@ -98,6 +115,10 @@ namespace m0n0t0nysMod
             _showEnemyNames      = PlayerPrefs.GetInt(PREF_ENEMY_NAMES,      1) == 1;
             _transferEnabled     = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
             _transferModifier    = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
+            _autoCloseOnWASD     = PlayerPrefs.GetInt(PREF_AC_WASD,   0) == 1;
+            _autoCloseOnShift    = PlayerPrefs.GetInt(PREF_AC_SHIFT,  0) == 1;
+            _autoCloseOnSpace    = PlayerPrefs.GetInt(PREF_AC_SPACE,  0) == 1;
+            _autoCloseOnDamage   = PlayerPrefs.GetInt(PREF_AC_DAMAGE, 0) == 1;
             _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1) == 1;
             _preset1Hour         = PlayerPrefs.GetInt(PREF_PRESET1H,  5);
             _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
@@ -150,6 +171,9 @@ if (mod) TryShiftClickTransfer();
                     UpdateEnemyNameBars();
                 }
             }
+
+            if (_autoCloseOnWASD || _autoCloseOnShift || _autoCloseOnSpace || _autoCloseOnDamage)
+                CheckAutoCloseContainer();
         }
 
         void LateUpdate()
@@ -213,6 +237,61 @@ if (!lvActive || item == null) return;
                 charInv.RemoveItem(item);
                 if (!lootInv.AddItem(item))
                     charInv.AddItem(item);
+            }
+        }
+
+        // ── Auto-close container ──────────────────────────────────────────
+
+        private void CheckAutoCloseContainer()
+        {
+            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
+            if (lv == null || !lv.gameObject.activeInHierarchy) return;
+
+            if (_autoCloseOnWASD &&
+                (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) ||
+                 Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.D)))
+            { lv.Close(); return; }
+
+            if (_autoCloseOnShift &&
+                (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift)))
+            { lv.Close(); return; }
+
+            if (_autoCloseOnSpace && Input.GetKeyDown(KeyCode.Space))
+            { lv.Close(); return; }
+
+            if (_autoCloseOnDamage)
+            {
+                if (_playerHealthComp == null)
+                {
+                    _damageInitTimer -= Time.deltaTime;
+                    if (_damageInitTimer <= 0f) { _damageInitTimer = 3f; TryInitPlayerHealth(); }
+                }
+                else if (_playerHealthValueProp != null)
+                {
+                    float cur = (float)(_playerHealthValueProp.GetValue(_playerHealthComp) ?? (object)float.MaxValue);
+                    if (cur < _playerHealthPrev) { _playerHealthPrev = cur; lv.Close(); return; }
+                    _playerHealthPrev = cur;
+                }
+            }
+        }
+
+        private void TryInitPlayerHealth()
+        {
+            foreach (var ch in FindObjectsOfType<CharacterMainControl>())
+            {
+                if (!ch.IsMainCharacter) continue;
+                foreach (var comp in ch.GetComponents<Component>())
+                {
+                    var t = comp.GetType();
+                    var prop = t.GetProperty("Current", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop?.PropertyType == typeof(float))
+                    {
+                        _playerHealthComp     = comp;
+                        _playerHealthValueProp = prop;
+                        _playerHealthPrev      = (float)prop.GetValue(comp)!;
+                        return;
+                    }
+                }
             }
         }
 
@@ -482,7 +561,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v1.5", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v1.6", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -568,9 +647,42 @@ if (!lvActive || item == null) return;
             btnAl.onClick.AddListener(() => SetTransferModifier(TransferModifier.Alt));
             RefreshTransferModifierButtons();
 
+            var warnGo = new GameObject("ShiftConflictWarn");
+            warnGo.transform.SetParent(s3t.transform, false);
+            warnGo.AddComponent<RectTransform>();
+            var warnTMP = warnGo.AddComponent<TextMeshProUGUI>();
+            warnTMP.text = "Shift is also set to close containers.\nSwitch transfer to Alt to avoid conflicts.";
+            warnTMP.fontSize = 10f;
+            warnTMP.color = new Color(1f, 0.75f, 0.2f, 1f);
+            warnTMP.alignment = TextAlignmentOptions.Left;
+            warnGo.AddComponent<LayoutElement>().preferredHeight = 28f;
+            _shiftConflictWarning = warnGo;
+            RefreshShiftConflict();
+
             LGap(panel, 8f);
 
-            // ── Section 4: Sleep Presets ──────────────────────────────────
+            // ── Section 4: Auto-Close ─────────────────────────────────────
+            var s4ac = LSectionCard(panel);
+
+            LLabel(s4ac, "AUTO-CLOSE CONTAINER", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s4ac);
+
+            var acLabels = new[] { "Close on movement (W/A/S/D)", "Close on Shift", "Close on Space", "Close on damage" };
+            _autoCloseBtnImages = new Image[4];
+            _autoCloseBtnTexts  = new TextMeshProUGUI[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var idx = i;
+                var (acRow, acImg, acTMP) = LToggleRow(s4ac, acLabels[i]);
+                _autoCloseBtnImages[i] = acImg;
+                _autoCloseBtnTexts[i]  = acTMP;
+                acRow.GetComponentInChildren<Button>().onClick.AddListener(() => OnAutoCloseToggleClicked(idx));
+            }
+            RefreshAutoCloseToggles();
+
+            LGap(panel, 8f);
+
+            // ── Section 5: Sleep Presets ──────────────────────────────────
             var s4 = LSectionCard(panel);
 
             LLabel(s4, "SLEEP PRESETS", 8f, new Color(0f, 0.78f, 0.52f, 1f));
@@ -892,6 +1004,7 @@ if (!lvActive || item == null) return;
             PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, _transferEnabled ? 1 : 0);
             PlayerPrefs.Save();
             RefreshTransferToggle();
+            RefreshShiftConflict();
         }
 
         private void RefreshTransferToggle()
@@ -922,6 +1035,43 @@ if (!lvActive || item == null) return;
                     : new Color(0.11f, 0.115f, 0.15f, 1f);
                 _transferModBtnLabels![i].color = active ? Color.white : new Color(0.40f, 0.40f, 0.50f, 1f);
                 _transferModBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
+            }
+            RefreshShiftConflict();
+        }
+
+        private void RefreshShiftConflict()
+        {
+            bool conflict = _transferEnabled
+                         && _transferModifier == TransferModifier.Shift
+                         && _autoCloseOnShift;
+            if (_shiftConflictWarning != null)
+                _shiftConflictWarning.SetActive(conflict);
+        }
+
+        private void OnAutoCloseToggleClicked(int index)
+        {
+            switch (index)
+            {
+                case 0: _autoCloseOnWASD   = !_autoCloseOnWASD;   PlayerPrefs.SetInt(PREF_AC_WASD,   _autoCloseOnWASD   ? 1 : 0); break;
+                case 1: _autoCloseOnShift  = !_autoCloseOnShift;  PlayerPrefs.SetInt(PREF_AC_SHIFT,  _autoCloseOnShift  ? 1 : 0); break;
+                case 2: _autoCloseOnSpace  = !_autoCloseOnSpace;  PlayerPrefs.SetInt(PREF_AC_SPACE,  _autoCloseOnSpace  ? 1 : 0); break;
+                case 3: _autoCloseOnDamage = !_autoCloseOnDamage; PlayerPrefs.SetInt(PREF_AC_DAMAGE, _autoCloseOnDamage ? 1 : 0); break;
+            }
+            PlayerPrefs.Save();
+            RefreshAutoCloseToggles();
+            RefreshShiftConflict();
+        }
+
+        private void RefreshAutoCloseToggles()
+        {
+            var states = new[] { _autoCloseOnWASD, _autoCloseOnShift, _autoCloseOnSpace, _autoCloseOnDamage };
+            for (int i = 0; i < 4; i++)
+            {
+                _autoCloseBtnImages![i].color = states[i]
+                    ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                    : new Color(0.48f, 0.10f, 0.10f, 1f);
+                _autoCloseBtnTexts![i].text  = states[i] ? "ON" : "OFF";
+                _autoCloseBtnTexts![i].color = Color.white;
             }
         }
 
