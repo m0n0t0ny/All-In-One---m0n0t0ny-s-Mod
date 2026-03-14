@@ -11,6 +11,7 @@ using UnityEngine.UI;
 namespace m0n0t0nysMod
 {
     enum DisplayMode { Combined, SingleOnly, StackOnly }
+    enum TransferModifier { Shift, Alt }
 
     public class ModBehaviour : Duckov.Modding.ModBehaviour
     {
@@ -22,13 +23,31 @@ namespace m0n0t0nysMod
         private const string PREF_PRESET1M       = "DisplayItemValue_Preset1M";
         private const string PREF_PRESET2H       = "DisplayItemValue_Preset2H";
         private const string PREF_PRESET2M        = "DisplayItemValue_Preset2M";
-        private const string PREF_ENEMY_NAMES     = "DisplayItemValue_EnemyNames";
-        private const KeyCode MENU_KEY             = KeyCode.F9;
+        private const string PREF_ENEMY_NAMES       = "DisplayItemValue_EnemyNames";
+        private const string PREF_TRANSFER_ENABLED  = "DisplayItemValue_TransferEnabled";
+        private const string PREF_TRANSFER_MOD      = "DisplayItemValue_TransferMod";
+        private const KeyCode MENU_KEY               = KeyCode.F9;
 
         // ── Item value display ────────────────────────────────────────────
         private bool _showValue;
         private DisplayMode _mode;
         private TextMeshProUGUI? _valueText;
+        private Item? _lastHoveredItem;
+
+        // ── Shift/Alt-click transfer ──────────────────────────────────────
+        private bool _transferEnabled;
+        private TransferModifier _transferModifier;
+        private Item? _transferCachedItem; // snapshotted at end of each frame via LateUpdate
+        private Image? _transferToggleImage;
+        private TextMeshProUGUI? _transferToggleText;
+        private Image[]? _transferModBtnImages;
+        private TextMeshProUGUI[]? _transferModBtnLabels;
+        private static readonly FieldInfo? _lootCharInvField =
+            typeof(LootView).GetField("characterInventoryDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly FieldInfo? _lootTargetInvField =
+            typeof(LootView).GetField("lootTargetInventoryDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly PropertyInfo? _invDisplayTargetProp =
+            typeof(InventoryDisplay).GetProperty("Target", BindingFlags.Public | BindingFlags.Instance);
 
         // ── Enemy name display ────────────────────────────────────────────
         private bool _showEnemyNames;
@@ -76,14 +95,16 @@ namespace m0n0t0nysMod
         {
             _showValue           = PlayerPrefs.GetInt(PREF_ENABLED,      1) == 1;
             _mode                = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
-            _showEnemyNames      = PlayerPrefs.GetInt(PREF_ENEMY_NAMES,  1) == 1;
+            _showEnemyNames      = PlayerPrefs.GetInt(PREF_ENEMY_NAMES,      1) == 1;
+            _transferEnabled     = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
+            _transferModifier    = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
             _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1) == 1;
             _preset1Hour         = PlayerPrefs.GetInt(PREF_PRESET1H,  5);
             _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
             _preset2Hour         = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
             _preset2Min          = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
             Debug.Log($"[m0n0t0nysMod] Loaded. Press {MENU_KEY} to open settings.");
-            BuildSettingsPanel();
+BuildSettingsPanel();
         }
 
         void OnDestroy()
@@ -112,6 +133,14 @@ namespace m0n0t0nysMod
             if (_sleepPresetsEnabled)
                 CheckSleepViewInjection();
 
+            if (_transferEnabled && Input.GetMouseButtonDown(0))
+            {
+                bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+                bool alt   = Input.GetKey(KeyCode.LeftAlt)   || Input.GetKey(KeyCode.RightAlt);
+                bool mod   = _transferModifier == TransferModifier.Shift ? shift : alt;
+if (mod) TryShiftClickTransfer();
+            }
+
             if (_showEnemyNames)
             {
                 _nameUpdateTimer -= Time.deltaTime;
@@ -121,6 +150,14 @@ namespace m0n0t0nysMod
                     UpdateEnemyNameBars();
                 }
             }
+        }
+
+        void LateUpdate()
+        {
+            // Snapshot the hovered item at the END of every frame so that
+            // TryShiftClickTransfer() in the NEXT frame's Update() sees a
+            // stable value even if EventSystem clears the hover mid-frame.
+            _transferCachedItem = _lastHoveredItem;
         }
 
         // ── Enemy Name Bars ───────────────────────────────────────────────
@@ -148,6 +185,34 @@ namespace m0n0t0nysMod
 
                 nameTMP.text = displayName;
                 nameTMP.gameObject.SetActive(true);
+            }
+        }
+
+        // ── Shift-click transfer ──────────────────────────────────────────
+
+        private void TryShiftClickTransfer()
+        {
+            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
+            bool lvActive = lv != null && lv.gameObject.activeInHierarchy;
+            var item = _transferCachedItem ?? _lastHoveredItem;
+if (!lvActive || item == null) return;
+
+            var charInvDisplay = _lootCharInvField?.GetValue(lv)  as InventoryDisplay;
+            var lootInvDisplay = _lootTargetInvField?.GetValue(lv) as InventoryDisplay;
+            var charInv = _invDisplayTargetProp?.GetValue(charInvDisplay) as Inventory;
+            var lootInv = _invDisplayTargetProp?.GetValue(lootInvDisplay) as Inventory;
+
+            if (lootInv != null && lootInv.Content.Contains(item) && charInv != null)
+            {
+                lootInv.RemoveItem(item);
+                if (!charInv.AddItem(item))
+                    lootInv.AddItem(item);
+            }
+            else if (charInv != null && charInv.Content.Contains(item) && lootInv != null)
+            {
+                charInv.RemoveItem(item);
+                if (!lootInv.AddItem(item))
+                    charInv.AddItem(item);
             }
         }
 
@@ -323,7 +388,10 @@ namespace m0n0t0nysMod
                 var s = GetSlider(sv);
                 var m = getMinutes();
                 if (s != null && m.HasValue && m.Value > 0)
-                    s.value = Mathf.Clamp(m.Value, s.minValue, s.maxValue);
+                {
+                    if (m.Value > s.maxValue) s.maxValue = m.Value;
+                    s.value = m.Value;
+                }
             });
             return tmp;
         }
@@ -414,7 +482,7 @@ namespace m0n0t0nysMod
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v1.0", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v1.5", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -471,19 +539,50 @@ namespace m0n0t0nysMod
 
             LGap(panel, 8f);
 
-            // ── Section 3: Sleep Presets ──────────────────────────────────
-            var s3 = LSectionCard(panel);
+            // ── Section 3: Item Transfer ──────────────────────────────────
+            var s3t = LSectionCard(panel);
 
-            LLabel(s3, "SLEEP PRESETS", 8f, new Color(0f, 0.78f, 0.52f, 1f));
-            LDivider(s3);
+            LLabel(s3t, "ITEM TRANSFER", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s3t);
 
-            var (stRow, stImg, stTMP) = LToggleRow(s3, "Wake-up preset buttons");
+            var (trRow, trImg, trTMP) = LToggleRow(s3t, "Modifier + click to transfer items");
+            _transferToggleImage = trImg;
+            _transferToggleText  = trTMP;
+            trRow.GetComponentInChildren<Button>().onClick.AddListener(OnTransferToggleClicked);
+            RefreshTransferToggle();
+
+            LLabel(s3t, "Modifier key", 10f, new Color(0.48f, 0.48f, 0.58f, 1f));
+
+            var modRow = LChild(s3t, "ModRow", 34f);
+            modRow.GetComponent<Image>().color = Color.clear;
+            var modHLG = modRow.AddComponent<HorizontalLayoutGroup>();
+            modHLG.spacing               = 5f;
+            modHLG.childForceExpandWidth  = true;
+            modHLG.childForceExpandHeight = true;
+
+            var (btnSh, imgSh, lblSh) = LModeBtn(modRow, "Shift");
+            var (btnAl, imgAl, lblAl) = LModeBtn(modRow, "Alt");
+            _transferModBtnImages = new[] { imgSh, imgAl };
+            _transferModBtnLabels = new[] { lblSh, lblAl };
+            btnSh.onClick.AddListener(() => SetTransferModifier(TransferModifier.Shift));
+            btnAl.onClick.AddListener(() => SetTransferModifier(TransferModifier.Alt));
+            RefreshTransferModifierButtons();
+
+            LGap(panel, 8f);
+
+            // ── Section 4: Sleep Presets ──────────────────────────────────
+            var s4 = LSectionCard(panel);
+
+            LLabel(s4, "SLEEP PRESETS", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s4);
+
+            var (stRow, stImg, stTMP) = LToggleRow(s4, "Wake-up preset buttons");
             _sleepToggleImage = stImg;
             _sleepToggleText  = stTMP;
             stRow.GetComponentInChildren<Button>().onClick.AddListener(OnSleepToggleClicked);
             RefreshSleepToggle();
 
-            LPickerRow(s3, "Preset 1",
+            LPickerRow(s4, "Preset 1",
                 () => _preset1Hour,
                 v => { _preset1Hour = v; PlayerPrefs.SetInt(PREF_PRESET1H, v); PlayerPrefs.Save();
                        if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; },
@@ -491,7 +590,7 @@ namespace m0n0t0nysMod
                 v => { _preset1Min  = v; PlayerPrefs.SetInt(PREF_PRESET1M, v); PlayerPrefs.Save();
                        if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; });
 
-            LPickerRow(s3, "Preset 2",
+            LPickerRow(s4, "Preset 2",
                 () => _preset2Hour,
                 v => { _preset2Hour = v; PlayerPrefs.SetInt(PREF_PRESET2H, v); PlayerPrefs.Save();
                        if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; },
@@ -787,15 +886,56 @@ namespace m0n0t0nysMod
             _enemyNamesToggleText!.color = Color.white;
         }
 
+        private void OnTransferToggleClicked()
+        {
+            _transferEnabled = !_transferEnabled;
+            PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, _transferEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshTransferToggle();
+        }
+
+        private void RefreshTransferToggle()
+        {
+            _transferToggleImage!.color = _transferEnabled
+                ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                : new Color(0.48f, 0.10f, 0.10f, 1f);
+            _transferToggleText!.text  = _transferEnabled ? "ON" : "OFF";
+            _transferToggleText!.color = Color.white;
+        }
+
+        private void SetTransferModifier(TransferModifier mod)
+        {
+            _transferModifier = mod;
+            PlayerPrefs.SetInt(PREF_TRANSFER_MOD, (int)mod);
+            PlayerPrefs.Save();
+            RefreshTransferModifierButtons();
+        }
+
+        private void RefreshTransferModifierButtons()
+        {
+            var mods = new[] { TransferModifier.Shift, TransferModifier.Alt };
+            for (int i = 0; i < 2; i++)
+            {
+                bool active = mods[i] == _transferModifier;
+                _transferModBtnImages![i].color = active
+                    ? new Color(0.04f, 0.42f, 0.28f, 1f)
+                    : new Color(0.11f, 0.115f, 0.15f, 1f);
+                _transferModBtnLabels![i].color = active ? Color.white : new Color(0.40f, 0.40f, 0.50f, 1f);
+                _transferModBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
+            }
+        }
+
         // ── Item Hover UI ─────────────────────────────────────────────────
 
         private void OnSetupMeta(ItemHoveringUI ui, ItemMetaData data)
         {
+            _lastHoveredItem = null;
             ValueText.gameObject.SetActive(false);
         }
 
         private void OnSetupItemHoveringUI(ItemHoveringUI uiInstance, Item item)
         {
+            _lastHoveredItem = item;
             if (!_showValue || item == null)
             {
                 ValueText.gameObject.SetActive(false);
