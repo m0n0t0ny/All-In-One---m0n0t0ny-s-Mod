@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using Duckov.UI;
 using Duckov.Utilities;
 using Duckov.Weathers;
@@ -105,12 +107,8 @@ namespace m0n0t0nysMod
         private bool _showRecorderBadge;
         private Image? _recorderToggleImage;
         private TextMeshProUGUI? _recorderToggleText;
-        // CraftingManager reflection
-        private static PropertyInfo? _cmInstanceProp;
-        private static MethodInfo?   _cmIsUnlockedMethod;
-        // Item.ItemPreset and preset.ID reflection
-        private static PropertyInfo? _itemPresetProp;
-        private static PropertyInfo? _presetIdProp;
+        // ItemUtilities.IsRegistered(Item) → bool  (static helper used by the game)
+        private static MethodInfo? _isRegisteredMethod;
         // Slot badge overlay tracking
         private static Type?       _slotCompType;
         private static MemberInfo? _slotItemMember; // PropertyInfo or FieldInfo → Item
@@ -147,7 +145,7 @@ namespace m0n0t0nysMod
             _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             Debug.Log($"[m0n0t0nysMod] Loaded. Press {MENU_KEY} to open settings.");
             CacheRecorderReflection();
-BuildSettingsPanel();
+            BuildSettingsPanel();
         }
 
         void OnDestroy()
@@ -184,7 +182,7 @@ BuildSettingsPanel();
                 bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
                 bool alt   = Input.GetKey(KeyCode.LeftAlt)   || Input.GetKey(KeyCode.RightAlt);
                 bool mod   = _transferModifier == TransferModifier.Shift ? shift : alt;
-if (mod) TryShiftClickTransfer();
+                if (mod) TryShiftClickTransfer();
             }
 
             if (_showEnemyNames)
@@ -560,55 +558,71 @@ if (!lvActive || item == null) return;
         {
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
+                if (_isRegisteredMethod != null) break;
+                var fn = asm.FullName ?? "";
+                if (fn.StartsWith("UnityEngine") || fn.StartsWith("System") ||
+                    fn.StartsWith("Mono")        || fn.StartsWith("mscorlib") ||
+                    fn.StartsWith("TMPro")       || fn.StartsWith("Unity.")) continue;
                 Type[]? types = null;
                 try { types = asm.GetTypes(); } catch { continue; }
                 foreach (var t in types)
                 {
-                    if (t == null || t.Name != "CraftingManager") continue;
-                    _cmInstanceProp     = t.GetProperty("Instance",          BindingFlags.Public | BindingFlags.Static);
-                    _cmIsUnlockedMethod = t.GetMethod("IsFormulaUnlocked",   BindingFlags.Public | BindingFlags.Instance);
-                    Debug.Log($"[m0n0t0nysMod] CraftingManager cached: instance={_cmInstanceProp != null}, unlock={_cmIsUnlockedMethod != null}");
-                    break;
+                    if (t == null || t.Name != "ItemUtilities") continue;
+                    _isRegisteredMethod = t.GetMethods(BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly)
+                        .FirstOrDefault(m => m.Name == "IsRegistered" &&
+                                             m.ReturnType == typeof(bool) &&
+                                             m.GetParameters().Length == 1 &&
+                                             m.GetParameters()[0].ParameterType.Name == "Item");
+                    if (_isRegisteredMethod != null) break;
                 }
             }
-            // Cache Item → preset → ID reflection
-            var allItemProps = typeof(Item).GetProperties(BindingFlags.Public | BindingFlags.Instance);
-            foreach (var p in allItemProps)
-            {
-                if (!p.Name.Contains("Preset")) continue;
-                var idProp = p.PropertyType.GetProperty("ID", BindingFlags.Public | BindingFlags.Instance);
-                if (idProp != null && idProp.PropertyType == typeof(string))
-                {
-                    _itemPresetProp = p;
-                    _presetIdProp   = idProp;
-                    Debug.Log($"[m0n0t0nysMod] Item preset cached: {p.Name}.{idProp.Name}");
-                    break;
-                }
-            }
-        }
-
-        private static object? GetCM() => _cmInstanceProp?.GetValue(null);
-
-        private static string? GetItemPresetId(Item item)
-        {
-            if (_itemPresetProp == null) return null;
-            var preset = _itemPresetProp.GetValue(item);
-            if (preset == null) return null;
-            return _presetIdProp?.GetValue(preset) as string;
+            Debug.Log($"[m0n0t0nysMod] IsRegistered: {(_isRegisteredMethod != null ? "OK" : "MISSING")}");
         }
 
         private static bool IsRecipeRecorded(Item item)
         {
-            var id = GetItemPresetId(item);
-            if (id == null) return false;
-            var cm = GetCM();
-            if (cm == null || _cmIsUnlockedMethod == null) return false;
-            return (bool)(_cmIsUnlockedMethod.Invoke(cm, new object[] { id }) ?? false);
+            if (_isRegisteredMethod == null) return false;
+            try { return (bool)(_isRegisteredMethod.Invoke(null, new object[] { item }) ?? false); }
+            catch { return false; }
         }
 
         // ── Slot badge scanning ───────────────────────────────────────────
 
-        // Called from OnSetupItemHoveringUI — finds the slot by matching the exact Item instance
+        // Returns the first property or field of type Item on compType, using a per-type cache.
+        private static MemberInfo? FindItemMember(Type compType)
+        {
+            if (_typeItemMemberCache.TryGetValue(compType, out var cached))
+                return cached;
+
+            MemberInfo? member = null;
+            foreach (var prop in compType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            {
+                if (prop.PropertyType != typeof(Item)) continue;
+                member = prop;
+                break;
+            }
+            if (member == null)
+            {
+                foreach (var field in compType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                {
+                    if (field.FieldType != typeof(Item)) continue;
+                    member = field;
+                    break;
+                }
+            }
+            _typeItemMemberCache[compType] = member; // null → this type has no Item member
+            return member;
+        }
+
+        // Reads the Item value from a cached property or field member.
+        private static Item? ReadItemFromMember(MemberInfo member, object obj)
+        {
+            if (member is PropertyInfo pi) return pi.GetValue(obj) as Item;
+            if (member is FieldInfo   fi) return fi.GetValue(obj) as Item;
+            return null;
+        }
+
+        // Called from OnSetupItemHoveringUI — finds the slot by matching the exact Item instance.
         private static void TryCacheSlotTypeFromHover(Item item)
         {
             var es = EventSystem.current;
@@ -632,33 +646,12 @@ if (!lvActive || item == null) return;
                         foreach (var prop in compType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
                         {
                             if (prop.PropertyType != typeof(Item)) continue;
-                            try
-                            {
-                                if (prop.GetValue(mb) == (object)item)
-                                {
-                                    _slotCompType   = compType;
-                                    _slotItemMember = prop;
-                                    Debug.Log($"[m0n0t0nysMod] Slot found via hover: {compType.FullName}, prop: {prop.Name}");
-                                    return;
-                                }
-                            }
-                            catch { }
+                            try { if (prop.GetValue(mb) == (object)item) { _slotCompType = compType; _slotItemMember = prop; return; } } catch { }
                         }
-
                         foreach (var field in compType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
                         {
                             if (field.FieldType != typeof(Item)) continue;
-                            try
-                            {
-                                if (field.GetValue(mb) == (object)item)
-                                {
-                                    _slotCompType   = compType;
-                                    _slotItemMember = field;
-                                    Debug.Log($"[m0n0t0nysMod] Slot found via hover: {compType.FullName}, field: {field.Name}");
-                                    return;
-                                }
-                            }
-                            catch { }
+                            try { if (field.GetValue(mb) == (object)item) { _slotCompType = compType; _slotItemMember = field; return; } } catch { }
                         }
                     }
                     t = t.parent;
@@ -682,12 +675,7 @@ if (!lvActive || item == null) return;
                     int id = mb.GetInstanceID();
                     seen.Add(id);
 
-                    Item? item = null;
-                    if (_slotItemMember is PropertyInfo pi)
-                        item = pi.GetValue(mb) as Item;
-                    else if (_slotItemMember is FieldInfo fi)
-                        item = fi.GetValue(mb) as Item;
-
+                    var item      = ReadItemFromMember(_slotItemMember!, mb);
                     bool showBadge = item != null && IsRecipeRecorded(item);
 
                     if (!_slotBadges.TryGetValue(id, out var badge))
@@ -712,8 +700,8 @@ if (!lvActive || item == null) return;
             }
             else
             {
-                // Slow path: scan ALL UI MonoBehaviours to find recorded recipe items
-                // Runs until _slotCompType is discovered (then fast path takes over)
+                // Slow path: scan ALL UI MonoBehaviours to find recorded recipe items.
+                // Runs until _slotCompType is discovered, then fast path takes over.
                 BroadScanForRecordedItems();
             }
         }
@@ -723,58 +711,43 @@ if (!lvActive || item == null) return;
             foreach (var mb in FindObjectsOfType<MonoBehaviour>())
             {
                 if (mb == null || !mb.gameObject.activeInHierarchy) continue;
-                if (mb.GetComponent<RectTransform>() == null) continue;
+                if (!(mb.transform is RectTransform)) continue;
                 if (mb.GetType() == GetType()) continue; // skip self
 
                 var compType = mb.GetType();
-                int id = mb.GetInstanceID();
+                int id       = mb.GetInstanceID();
 
-                // Resolve cached Item member for this component type (reflection only once per type)
-                if (!_typeItemMemberCache.TryGetValue(compType, out var member))
-                {
-                    member = null;
-                    foreach (var prop in compType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-                    {
-                        if (prop.PropertyType != typeof(Item)) continue;
-                        member = prop;
-                        break;
-                    }
-                    if (member == null)
-                    {
-                        foreach (var field in compType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-                        {
-                            if (field.FieldType != typeof(Item)) continue;
-                            member = field;
-                            break;
-                        }
-                    }
-                    _typeItemMemberCache[compType] = member; // null → this type has no Item member
-                }
+                if (mb is ItemHoveringUI) continue; // skip tooltip UI
+                // Skip HUD/action-bar/button components — not inventory slots
+                var tn = compType.Name;
+                if (tn.Contains("HUD")    || tn.Contains("Status") || tn.Contains("Stamina") ||
+                    tn.Contains("Health") || tn.Contains("Energy")  || tn.Contains("Equip")  ||
+                    tn.Contains("Button") || tn.Contains("Weapon")  || tn.Contains("Action")) continue;
 
+                var member = FindItemMember(compType);
                 if (member == null) continue;
 
-                Item? item = null;
-                try
-                {
-                    if (member is PropertyInfo pi2) item = pi2.GetValue(mb) as Item;
-                    else if (member is FieldInfo fi2) item = fi2.GetValue(mb) as Item;
-                }
+                Item? item;
+                try   { item = ReadItemFromMember(member, mb); }
                 catch { continue; }
 
-                bool showBadge = item != null && IsRecipeRecorded(item);
+                if (item == null) continue; // skip empty slots
+
+                // Discover slot type from any slot holding any item (not just registered ones)
+                if (_slotCompType == null)
+                {
+                    _slotCompType   = compType;
+                    _slotItemMember = member;
+                    Debug.Log($"[m0n0t0nysMod] Slot type discovered: {compType.Name}.{member.Name}");
+                }
+
+                bool showBadge = IsRecipeRecorded(item);
 
                 if (!_slotBadges.TryGetValue(id, out var badge))
                 {
                     if (!showBadge) continue;
                     badge = CreateSlotBadge(mb);
                     _slotBadges[id] = badge;
-                    // Cache slot type so next tick uses the fast path
-                    if (_slotCompType == null)
-                    {
-                        _slotCompType   = compType;
-                        _slotItemMember = member;
-                        Debug.Log($"[m0n0t0nysMod] Slot type cached via broad scan: {compType.Name}.{member.Name}");
-                    }
                 }
                 else
                 {
@@ -801,20 +774,22 @@ if (!lvActive || item == null) return;
             var badge = new GameObject("RecorderBadge");
             badge.transform.SetParent(slot.transform, false);
             var rt = badge.AddComponent<RectTransform>();
-            rt.anchorMin        = new Vector2(1f, 0f);
-            rt.anchorMax        = new Vector2(1f, 0f);
-            rt.pivot            = new Vector2(1f, 0f);
-            rt.anchoredPosition = new Vector2(-2f, 2f);
-            rt.sizeDelta        = new Vector2(14f, 14f);
+            rt.anchorMin        = new Vector2(1f, 1f);
+            rt.anchorMax        = new Vector2(1f, 1f);
+            rt.pivot            = new Vector2(1f, 1f);
+            rt.anchoredPosition = new Vector2(-2f, -2f);
+            rt.sizeDelta        = new Vector2(18f, 18f);
 
             var circleImg = badge.AddComponent<Image>();
-            circleImg.color = new Color(0.13f, 0.65f, 0.28f, 1f);
+            circleImg.color  = new Color(0.13f, 0.65f, 0.28f, 1f);
+            circleImg.sprite = GetOrCreateCircleSprite();
+            circleImg.type   = Image.Type.Simple;
 
             var txtGo = new GameObject("Check");
             txtGo.transform.SetParent(badge.transform, false);
             var tmp = txtGo.AddComponent<TextMeshProUGUI>();
             tmp.text      = "✓";
-            tmp.fontSize  = 10f;
+            tmp.fontSize  = 13f;
             tmp.color     = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Bold;
@@ -823,6 +798,24 @@ if (!lvActive || item == null) return;
             tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
 
             return badge;
+        }
+
+        private static Sprite? _circleSprite;
+        private static Sprite GetOrCreateCircleSprite()
+        {
+            if (_circleSprite != null) return _circleSprite;
+            const int size = 64;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float r = size / 2f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - r + 0.5f, dy = y - r + 0.5f;
+                    tex.SetPixel(x, y, dx * dx + dy * dy <= r * r ? Color.white : Color.clear);
+                }
+            tex.Apply();
+            _circleSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f));
+            return _circleSprite;
         }
 
         // ── Settings Panel ────────────────────────────────────────────────
@@ -1430,7 +1423,7 @@ if (!lvActive || item == null) return;
             _lastHoveredItem = item;
 
             // Use hover event to discover slot component type (most reliable method)
-            if (_showRecorderBadge && _slotCompType == null && item != null)
+            if (_showRecorderBadge && item != null && _slotCompType == null)
                 TryCacheSlotTypeFromHover(item);
 
             if (!_showValue || item == null)
