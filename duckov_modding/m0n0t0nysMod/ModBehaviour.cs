@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using Duckov.UI;
 using Duckov.Utilities;
@@ -7,6 +8,7 @@ using ItemStatsSystem;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 namespace m0n0t0nysMod
 {
@@ -98,6 +100,24 @@ namespace m0n0t0nysMod
         private TextMeshProUGUI? _preset1BtnLabel;
         private TextMeshProUGUI? _preset2BtnLabel;
 
+        // ── Factory Recorder badge ────────────────────────────────────────
+        private const string PREF_RECORDER_BADGE = "DisplayItemValue_RecorderBadge";
+        private bool _showRecorderBadge;
+        private Image? _recorderToggleImage;
+        private TextMeshProUGUI? _recorderToggleText;
+        // CraftingManager reflection
+        private static PropertyInfo? _cmInstanceProp;
+        private static MethodInfo?   _cmIsUnlockedMethod;
+        // Item.ItemPreset and preset.ID reflection
+        private static PropertyInfo? _itemPresetProp;
+        private static PropertyInfo? _presetIdProp;
+        // Slot badge overlay tracking
+        private static Type?       _slotCompType;
+        private static MemberInfo? _slotItemMember; // PropertyInfo or FieldInfo → Item
+        private static readonly Dictionary<Type, MemberInfo?> _typeItemMemberCache = new Dictionary<Type, MemberInfo?>();
+        private float _badgeScanTimer;
+        private readonly Dictionary<int, GameObject> _slotBadges = new Dictionary<int, GameObject>();
+
         TextMeshProUGUI ValueText
         {
             get
@@ -124,7 +144,9 @@ namespace m0n0t0nysMod
             _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
             _preset2Hour         = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
             _preset2Min          = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
+            _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             Debug.Log($"[m0n0t0nysMod] Loaded. Press {MENU_KEY} to open settings.");
+            CacheRecorderReflection();
 BuildSettingsPanel();
         }
 
@@ -132,6 +154,9 @@ BuildSettingsPanel();
         {
             if (_valueText != null) Destroy(_valueText.gameObject);
             if (_settingsCanvas != null) Destroy(_settingsCanvas);
+            foreach (var kvp in _slotBadges)
+                if (kvp.Value != null) Destroy(kvp.Value);
+            _slotBadges.Clear();
         }
 
         void OnEnable()
@@ -174,6 +199,16 @@ if (mod) TryShiftClickTransfer();
 
             if (_autoCloseOnWASD || _autoCloseOnShift || _autoCloseOnSpace || _autoCloseOnDamage)
                 CheckAutoCloseContainer();
+
+            if (_showRecorderBadge)
+            {
+                _badgeScanTimer -= Time.deltaTime;
+                if (_badgeScanTimer <= 0f)
+                {
+                    _badgeScanTimer = 0.5f;
+                    ScanAndBadgeSlots();
+                }
+            }
         }
 
         void LateUpdate()
@@ -519,6 +554,277 @@ if (!lvActive || item == null) return;
             return null;
         }
 
+        // ── Factory Recorder reflection ───────────────────────────────────
+
+        private static void CacheRecorderReflection()
+        {
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                Type[]? types = null;
+                try { types = asm.GetTypes(); } catch { continue; }
+                foreach (var t in types)
+                {
+                    if (t == null || t.Name != "CraftingManager") continue;
+                    _cmInstanceProp     = t.GetProperty("Instance",          BindingFlags.Public | BindingFlags.Static);
+                    _cmIsUnlockedMethod = t.GetMethod("IsFormulaUnlocked",   BindingFlags.Public | BindingFlags.Instance);
+                    Debug.Log($"[m0n0t0nysMod] CraftingManager cached: instance={_cmInstanceProp != null}, unlock={_cmIsUnlockedMethod != null}");
+                    break;
+                }
+            }
+            // Cache Item → preset → ID reflection
+            var allItemProps = typeof(Item).GetProperties(BindingFlags.Public | BindingFlags.Instance);
+            foreach (var p in allItemProps)
+            {
+                if (!p.Name.Contains("Preset")) continue;
+                var idProp = p.PropertyType.GetProperty("ID", BindingFlags.Public | BindingFlags.Instance);
+                if (idProp != null && idProp.PropertyType == typeof(string))
+                {
+                    _itemPresetProp = p;
+                    _presetIdProp   = idProp;
+                    Debug.Log($"[m0n0t0nysMod] Item preset cached: {p.Name}.{idProp.Name}");
+                    break;
+                }
+            }
+        }
+
+        private static object? GetCM() => _cmInstanceProp?.GetValue(null);
+
+        private static string? GetItemPresetId(Item item)
+        {
+            if (_itemPresetProp == null) return null;
+            var preset = _itemPresetProp.GetValue(item);
+            if (preset == null) return null;
+            return _presetIdProp?.GetValue(preset) as string;
+        }
+
+        private static bool IsRecipeRecorded(Item item)
+        {
+            var id = GetItemPresetId(item);
+            if (id == null) return false;
+            var cm = GetCM();
+            if (cm == null || _cmIsUnlockedMethod == null) return false;
+            return (bool)(_cmIsUnlockedMethod.Invoke(cm, new object[] { id }) ?? false);
+        }
+
+        // ── Slot badge scanning ───────────────────────────────────────────
+
+        // Called from OnSetupItemHoveringUI — finds the slot by matching the exact Item instance
+        private static void TryCacheSlotTypeFromHover(Item item)
+        {
+            var es = EventSystem.current;
+            if (es == null) return;
+
+            var pointerData = new PointerEventData(es) { position = Input.mousePosition };
+            var results = new List<RaycastResult>();
+            es.RaycastAll(pointerData, results);
+
+            foreach (var result in results)
+            {
+                if (result.gameObject == null) continue;
+                var t = result.gameObject.transform;
+                while (t != null)
+                {
+                    foreach (var mb in t.GetComponents<MonoBehaviour>())
+                    {
+                        if (mb == null) continue;
+                        var compType = mb.GetType();
+
+                        foreach (var prop in compType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                        {
+                            if (prop.PropertyType != typeof(Item)) continue;
+                            try
+                            {
+                                if (prop.GetValue(mb) == (object)item)
+                                {
+                                    _slotCompType   = compType;
+                                    _slotItemMember = prop;
+                                    Debug.Log($"[m0n0t0nysMod] Slot found via hover: {compType.FullName}, prop: {prop.Name}");
+                                    return;
+                                }
+                            }
+                            catch { }
+                        }
+
+                        foreach (var field in compType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                        {
+                            if (field.FieldType != typeof(Item)) continue;
+                            try
+                            {
+                                if (field.GetValue(mb) == (object)item)
+                                {
+                                    _slotCompType   = compType;
+                                    _slotItemMember = field;
+                                    Debug.Log($"[m0n0t0nysMod] Slot found via hover: {compType.FullName}, field: {field.Name}");
+                                    return;
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+                    t = t.parent;
+                }
+            }
+        }
+
+        private void ScanAndBadgeSlots()
+        {
+            if (_slotCompType != null)
+            {
+                // Fast path: scan only instances of the known slot type
+                var slots = FindObjectsOfType(_slotCompType);
+                var seen  = new HashSet<int>();
+
+                foreach (var obj in slots)
+                {
+                    var mb = obj as MonoBehaviour;
+                    if (mb == null || !mb.gameObject.activeInHierarchy) continue;
+
+                    int id = mb.GetInstanceID();
+                    seen.Add(id);
+
+                    Item? item = null;
+                    if (_slotItemMember is PropertyInfo pi)
+                        item = pi.GetValue(mb) as Item;
+                    else if (_slotItemMember is FieldInfo fi)
+                        item = fi.GetValue(mb) as Item;
+
+                    bool showBadge = item != null && IsRecipeRecorded(item);
+
+                    if (!_slotBadges.TryGetValue(id, out var badge))
+                    {
+                        if (!showBadge) continue;
+                        badge = CreateSlotBadge(mb);
+                        _slotBadges[id] = badge;
+                    }
+                    if (badge != null) badge.SetActive(showBadge);
+                }
+
+                var toRemove = new List<int>();
+                foreach (var kvp in _slotBadges)
+                {
+                    if (!seen.Contains(kvp.Key))
+                    {
+                        if (kvp.Value != null) Destroy(kvp.Value);
+                        toRemove.Add(kvp.Key);
+                    }
+                }
+                foreach (var k in toRemove) _slotBadges.Remove(k);
+            }
+            else
+            {
+                // Slow path: scan ALL UI MonoBehaviours to find recorded recipe items
+                // Runs until _slotCompType is discovered (then fast path takes over)
+                BroadScanForRecordedItems();
+            }
+        }
+
+        private void BroadScanForRecordedItems()
+        {
+            foreach (var mb in FindObjectsOfType<MonoBehaviour>())
+            {
+                if (mb == null || !mb.gameObject.activeInHierarchy) continue;
+                if (mb.GetComponent<RectTransform>() == null) continue;
+                if (mb.GetType() == GetType()) continue; // skip self
+
+                var compType = mb.GetType();
+                int id = mb.GetInstanceID();
+
+                // Resolve cached Item member for this component type (reflection only once per type)
+                if (!_typeItemMemberCache.TryGetValue(compType, out var member))
+                {
+                    member = null;
+                    foreach (var prop in compType.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                    {
+                        if (prop.PropertyType != typeof(Item)) continue;
+                        member = prop;
+                        break;
+                    }
+                    if (member == null)
+                    {
+                        foreach (var field in compType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                        {
+                            if (field.FieldType != typeof(Item)) continue;
+                            member = field;
+                            break;
+                        }
+                    }
+                    _typeItemMemberCache[compType] = member; // null → this type has no Item member
+                }
+
+                if (member == null) continue;
+
+                Item? item = null;
+                try
+                {
+                    if (member is PropertyInfo pi2) item = pi2.GetValue(mb) as Item;
+                    else if (member is FieldInfo fi2) item = fi2.GetValue(mb) as Item;
+                }
+                catch { continue; }
+
+                bool showBadge = item != null && IsRecipeRecorded(item);
+
+                if (!_slotBadges.TryGetValue(id, out var badge))
+                {
+                    if (!showBadge) continue;
+                    badge = CreateSlotBadge(mb);
+                    _slotBadges[id] = badge;
+                    // Cache slot type so next tick uses the fast path
+                    if (_slotCompType == null)
+                    {
+                        _slotCompType   = compType;
+                        _slotItemMember = member;
+                        Debug.Log($"[m0n0t0nysMod] Slot type cached via broad scan: {compType.Name}.{member.Name}");
+                    }
+                }
+                else
+                {
+                    badge?.SetActive(showBadge);
+                }
+            }
+
+            // Cleanup badges whose slot objects are gone or no longer active
+            var stale = new List<int>();
+            foreach (var kvp in _slotBadges)
+            {
+                if (kvp.Value == null || kvp.Value.transform.parent == null ||
+                    !kvp.Value.transform.parent.gameObject.activeInHierarchy)
+                {
+                    if (kvp.Value != null) Destroy(kvp.Value);
+                    stale.Add(kvp.Key);
+                }
+            }
+            foreach (var k in stale) _slotBadges.Remove(k);
+        }
+
+        private static GameObject CreateSlotBadge(MonoBehaviour slot)
+        {
+            var badge = new GameObject("RecorderBadge");
+            badge.transform.SetParent(slot.transform, false);
+            var rt = badge.AddComponent<RectTransform>();
+            rt.anchorMin        = new Vector2(1f, 0f);
+            rt.anchorMax        = new Vector2(1f, 0f);
+            rt.pivot            = new Vector2(1f, 0f);
+            rt.anchoredPosition = new Vector2(-2f, 2f);
+            rt.sizeDelta        = new Vector2(14f, 14f);
+
+            var circleImg = badge.AddComponent<Image>();
+            circleImg.color = new Color(0.13f, 0.65f, 0.28f, 1f);
+
+            var txtGo = new GameObject("Check");
+            txtGo.transform.SetParent(badge.transform, false);
+            var tmp = txtGo.AddComponent<TextMeshProUGUI>();
+            tmp.text      = "✓";
+            tmp.fontSize  = 10f;
+            tmp.color     = Color.white;
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontStyle = FontStyles.Bold;
+            var tr = txtGo.GetComponent<RectTransform>();
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+
+            return badge;
+        }
+
         // ── Settings Panel ────────────────────────────────────────────────
 
         private void BuildSettingsPanel()
@@ -561,7 +867,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v1.6", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v1.7", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -682,7 +988,21 @@ if (!lvActive || item == null) return;
 
             LGap(panel, 8f);
 
-            // ── Section 5: Sleep Presets ──────────────────────────────────
+            // ── Section 5: Factory Recorder ───────────────────────────────
+            var s5fr = LSectionCard(panel);
+
+            LLabel(s5fr, "FACTORY RECORDER", 8f, new Color(0f, 0.78f, 0.52f, 1f));
+            LDivider(s5fr);
+
+            var (frRow, frImg, frTMP) = LToggleRow(s5fr, "Show badge on recorded recipes & keys");
+            _recorderToggleImage = frImg;
+            _recorderToggleText  = frTMP;
+            frRow.GetComponentInChildren<Button>().onClick.AddListener(OnRecorderBadgeToggleClicked);
+            RefreshRecorderBadgeToggle();
+
+            LGap(panel, 8f);
+
+            // ── Section 6: Sleep Presets ──────────────────────────────────
             var s4 = LSectionCard(panel);
 
             LLabel(s4, "SLEEP PRESETS", 8f, new Color(0f, 0.78f, 0.52f, 1f));
@@ -1075,6 +1395,28 @@ if (!lvActive || item == null) return;
             }
         }
 
+        private void OnRecorderBadgeToggleClicked()
+        {
+            _showRecorderBadge = !_showRecorderBadge;
+            PlayerPrefs.SetInt(PREF_RECORDER_BADGE, _showRecorderBadge ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshRecorderBadgeToggle();
+            if (!_showRecorderBadge)
+            {
+                foreach (var kvp in _slotBadges)
+                    if (kvp.Value != null) kvp.Value.SetActive(false);
+            }
+        }
+
+        private void RefreshRecorderBadgeToggle()
+        {
+            _recorderToggleImage!.color = _showRecorderBadge
+                ? new Color(0.10f, 0.48f, 0.10f, 1f)
+                : new Color(0.48f, 0.10f, 0.10f, 1f);
+            _recorderToggleText!.text  = _showRecorderBadge ? "ON" : "OFF";
+            _recorderToggleText!.color = Color.white;
+        }
+
         // ── Item Hover UI ─────────────────────────────────────────────────
 
         private void OnSetupMeta(ItemHoveringUI ui, ItemMetaData data)
@@ -1086,6 +1428,11 @@ if (!lvActive || item == null) return;
         private void OnSetupItemHoveringUI(ItemHoveringUI uiInstance, Item item)
         {
             _lastHoveredItem = item;
+
+            // Use hover event to discover slot component type (most reliable method)
+            if (_showRecorderBadge && _slotCompType == null && item != null)
+                TryCacheSlotTypeFromHover(item);
+
             if (!_showValue || item == null)
             {
                 ValueText.gameObject.SetActive(false);
