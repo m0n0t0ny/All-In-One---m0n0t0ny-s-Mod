@@ -39,7 +39,9 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_AC_SPACE           = "DisplayItemValue_ACSpace";
         private const string PREF_AC_DAMAGE          = "DisplayItemValue_ACDamage";
         private const string PREF_FPS_COUNTER        = "DisplayItemValue_FpsCounter";
+        private const string PREF_SKIP_MELEE         = "DisplayItemValue_SkipMelee";
         private const KeyCode MENU_KEY               = KeyCode.F9;
+        private const string MC_MOD_NAME             = "All In One - m0n0t0ny's Mod";
 
         // ── Item value display ────────────────────────────────────────────
         private bool _showValue;
@@ -121,6 +123,19 @@ namespace AllInOneMod_m0n0t0ny
         private Image? _fpsToggleImage;
         private RectTransform? _fpsToggleThumb;
 
+        // ── Skip melee on scroll ──────────────────────────────────────────
+        private bool _skipMeleeOnScroll;
+        private bool _scrollDetectedThisFrame;
+        private int  _lastScrollDir;
+        private Image? _skipMeleeToggleImage;
+        private RectTransform? _skipMeleeToggleThumb;
+        private CharacterMainControl? _playerCtrl;
+
+        // ── ModConfig integration (optional) ─────────────────────────────
+        private static Type?    _mcAPI;
+        private bool            _mcChecked;
+        private Action<string>? _mcDelegate;
+
         // ── Factory Recorder badge ────────────────────────────────────────
         private const string PREF_RECORDER_BADGE = "DisplayItemValue_RecorderBadge";
         private bool _showRecorderBadge;
@@ -167,8 +182,10 @@ namespace AllInOneMod_m0n0t0ny
             _preset4Min          = PlayerPrefs.GetInt(PREF_PRESET4M,  0);
             _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
+            _skipMeleeOnScroll   = PlayerPrefs.GetInt(PREF_SKIP_MELEE,     1) == 1;
             CacheRecorderReflection();
             BuildSettingsPanel();
+            TryInitModConfig();
         }
 
         private void SetMenuVisible(bool open)
@@ -180,6 +197,18 @@ namespace AllInOneMod_m0n0t0ny
         void OnDestroy()
         {
             Time.timeScale = 1f;
+            if (_mcDelegate != null && _mcAPI != null)
+            {
+                try
+                {
+                    var rm = _mcAPI.GetMethod("SafeRemoveOnOptionsChangedDelegate",
+                        BindingFlags.Public | BindingFlags.Static, null,
+                        new[] { typeof(Action<string>) }, null);
+                    rm?.Invoke(null, new object[] { _mcDelegate });
+                }
+                catch { }
+                _mcDelegate = null;
+            }
             if (_valueText != null) Destroy(_valueText.gameObject);
             if (_settingsCanvas != null) Destroy(_settingsCanvas);
             if (_fpsCanvas != null) Destroy(_fpsCanvas);
@@ -234,6 +263,19 @@ namespace AllInOneMod_m0n0t0ny
 
         void Update()
         {
+            if (!_mcChecked) TryInitModConfig();
+
+            _scrollDetectedThisFrame = false;
+            if (_skipMeleeOnScroll)
+            {
+                float scroll = Input.GetAxisRaw("Mouse ScrollWheel");
+                if (scroll != 0f)
+                {
+                    _scrollDetectedThisFrame = true;
+                    _lastScrollDir = scroll > 0f ? 1 : -1;
+                }
+            }
+
             if (Input.GetKeyDown(MENU_KEY))
                 SetMenuVisible(!_settingsCanvas!.activeSelf);
 
@@ -292,6 +334,20 @@ namespace AllInOneMod_m0n0t0ny
             // TryShiftClickTransfer() in the NEXT frame's Update() sees a
             // stable value even if EventSystem clears the hover mid-frame.
             _transferCachedItem = _lastHoveredItem;
+
+            // Skip melee during scroll — the game has already switched weapons by LateUpdate,
+            // so if we ended up on melee we call SwitchWeapon once more to skip past it.
+            if (_skipMeleeOnScroll && _scrollDetectedThisFrame)
+            {
+                var ctrl = _playerCtrl;
+                if (ctrl == null)
+                {
+                    foreach (var ch in FindObjectsOfType<CharacterMainControl>())
+                    { if (ch.IsMainCharacter) { _playerCtrl = ch; ctrl = ch; break; } }
+                }
+                if (ctrl != null && ctrl.GetGun() == null && ctrl.GetMeleeWeapon() != null)
+                    ctrl.SwitchWeapon(_lastScrollDir);
+            }
         }
 
         // ── Enemy Name Bars ───────────────────────────────────────────────
@@ -457,9 +513,8 @@ if (!lvActive || item == null) return;
                 return;
             }
 
-            var sleepRect       = sleepBtn.GetComponent<RectTransform>();
-            var sleepImg        = sleepBtn.GetComponent<Image>();
-            var origParent      = sleepRect.parent;
+            var sleepRect  = sleepBtn.GetComponent<RectTransform>();
+            var origParent = sleepRect.parent;
             var origAnchorMin   = sleepRect.anchorMin;
             var origAnchorMax   = sleepRect.anchorMax;
             var origPivot       = sleepRect.pivot;
@@ -501,16 +556,16 @@ if (!lvActive || item == null) return;
             vLayout.childForceExpandHeight = true;
 
             var row1 = MakePresetRow(presetGrid);
-            _preset1BtnLabel = AddGridBtn(row1, sv, $"{_preset1Hour:D2}:{_preset1Min:D2}", () => MinutesUntilTime(_preset1Hour, _preset1Min), sleepImg);
-            _preset2BtnLabel = AddGridBtn(row1, sv, $"{_preset2Hour:D2}:{_preset2Min:D2}", () => MinutesUntilTime(_preset2Hour, _preset2Min), sleepImg);
-            _preset3BtnLabel = AddGridBtn(row1, sv, $"{_preset3Hour:D2}:{_preset3Min:D2}", () => MinutesUntilTime(_preset3Hour, _preset3Min), sleepImg);
-            _preset4BtnLabel = AddGridBtn(row1, sv, $"{_preset4Hour:D2}:{_preset4Min:D2}", () => MinutesUntilTime(_preset4Hour, _preset4Min), sleepImg);
+            _preset1BtnLabel = AddGridBtn(row1, sv, $"{_preset1Hour:D2}:{_preset1Min:D2}", () => MinutesUntilTime(_preset1Hour, _preset1Min), sleepBtn);
+            _preset2BtnLabel = AddGridBtn(row1, sv, $"{_preset2Hour:D2}:{_preset2Min:D2}", () => MinutesUntilTime(_preset2Hour, _preset2Min), sleepBtn);
+            _preset3BtnLabel = AddGridBtn(row1, sv, $"{_preset3Hour:D2}:{_preset3Min:D2}", () => MinutesUntilTime(_preset3Hour, _preset3Min), sleepBtn);
+            _preset4BtnLabel = AddGridBtn(row1, sv, $"{_preset4Hour:D2}:{_preset4Min:D2}", () => MinutesUntilTime(_preset4Hour, _preset4Min), sleepBtn);
 
             var row2 = MakePresetRow(presetGrid);
-            AddGridBtn(row2, sv, "Rain",       () => MinutesUntilRain(),     sleepImg);
-            AddGridBtn(row2, sv, "Storm I",    () => MinutesUntilStorm(1),   sleepImg);
-            AddGridBtn(row2, sv, "Storm II",   () => MinutesUntilStorm(2),   sleepImg);
-            AddGridBtn(row2, sv, "Post-Storm", () => MinutesUntilStormEnd(), sleepImg);
+            AddGridBtn(row2, sv, "Rain",       () => MinutesUntilRain(),     sleepBtn);
+            AddGridBtn(row2, sv, "Storm I",    () => MinutesUntilStorm(1),   sleepBtn);
+            AddGridBtn(row2, sv, "Storm II",   () => MinutesUntilStorm(2),   sleepBtn);
+            AddGridBtn(row2, sv, "Post-Storm", () => MinutesUntilStormEnd(), sleepBtn);
         }
 
         private static GameObject MakePresetRow(GameObject parent)
@@ -525,54 +580,69 @@ if (!lvActive || item == null) return;
             return row;
         }
 
-        private static TextMeshProUGUI AddGridBtn(GameObject row, SleepView sv, string label, Func<float?> getMinutes, Image? styleSource)
+        private static TextMeshProUGUI AddGridBtn(GameObject row, SleepView sv, string label, Func<float?> getMinutes, Button? template)
         {
-            var go  = new GameObject($"P_{label}");
-            go.transform.SetParent(row.transform, false);
+            // Clone the native Sleep button so appearance is identical
+            var go  = template != null
+                ? UnityEngine.Object.Instantiate(template.gameObject, row.transform, false)
+                : new GameObject($"P_{label}");
+            go.name = $"P_{label}";
+            if (template == null) go.transform.SetParent(row.transform, false);
 
-            var img = go.AddComponent<Image>();
-            if (styleSource?.sprite != null)
+            var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
+            btn.onClick.RemoveAllListeners();
+
+            // Hide any icon children (moon icon etc.) — keep only the text child
+            foreach (var childImg in go.GetComponentsInChildren<Image>(true))
             {
-                img.sprite = styleSource.sprite;
-                img.type   = styleSource.type;
-                img.color  = styleSource.color;
-            }
-            else
-            {
-                img.color = new Color(0.44f, 0.78f, 0.86f, 1f);
+                if (childImg.gameObject == go) continue; // root background — keep
+                if (childImg.GetComponentInChildren<TextMeshProUGUI>(true) == null)
+                    childImg.gameObject.SetActive(false);
             }
 
-            var btn  = go.AddComponent<Button>();
-            var cols = btn.colors;
-            cols.normalColor      = Color.white;
-            cols.highlightedColor = new Color(0.85f, 0.95f, 1f, 1f);
-            cols.pressedColor     = new Color(0.55f, 0.75f, 0.85f, 1f);
-            btn.colors        = cols;
-            btn.targetGraphic = img;
-
-            var txtGo = new GameObject("T");
-            txtGo.transform.SetParent(go.transform, false);
-            var tmp = txtGo.AddComponent<TextMeshProUGUI>();
-            tmp.text             = label;
-            tmp.enableAutoSizing = true;
-            tmp.fontSizeMin      = 8f;
-            tmp.fontSizeMax      = 20f;
-            tmp.alignment        = TextAlignmentOptions.Center;
-            tmp.enableWordWrapping = false;
-            var sleepTxt = styleSource?.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (sleepTxt != null)
+            // Update (or create) the text label
+            var tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tmp == null)
             {
-                tmp.font      = sleepTxt.font;
-                tmp.fontStyle = sleepTxt.fontStyle;
-                tmp.color     = sleepTxt.color;
-            }
-            else
-            {
+                var txtGo = new GameObject("T");
+                txtGo.transform.SetParent(go.transform, false);
+                tmp = txtGo.AddComponent<TextMeshProUGUI>();
                 tmp.color = Color.white;
+                var tr = txtGo.GetComponent<RectTransform>();
+                tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+                tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
             }
-            var tr = txtGo.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+            tmp.text               = label;
+            tmp.alignment          = TextAlignmentOptions.Center;
+            tmp.enableWordWrapping = false;
+            tmp.enableAutoSizing   = true;
+            tmp.fontSizeMin        = 6f;
+            tmp.fontSizeMax        = tmp.fontSize > 0 ? tmp.fontSize : 20f;
+
+            if (template != null)
+            {
+                // Make our buttons show the same color as Sleep in its highlighted state
+                // (that's the bright cyan the user sees as "the Sleep button color").
+                // visibleColor = Image.color × activeStateColor  (Unity multiplicative tint)
+                var srcImg  = template.GetComponent<Image>();
+                var srcCols = template.colors;
+                var baseColor = srcImg != null ? srcImg.color : Color.white;
+
+                var clonedImg = go.GetComponent<Image>();
+                if (clonedImg != null) clonedImg.color = Color.white; // let ColorBlock drive the color
+
+                var cols = btn.colors;
+                cols.normalColor      = baseColor * srcCols.highlightedColor;
+                cols.highlightedColor = Color.white;
+                cols.pressedColor     = baseColor * srcCols.pressedColor;
+                btn.colors = cols;
+            }
+            else
+            {
+                var img = go.AddComponent<Image>();
+                img.color         = new Color(0.44f, 0.78f, 0.86f, 1f);
+                btn.targetGraphic = img;
+            }
 
             btn.onClick.AddListener(() =>
             {
@@ -854,8 +924,8 @@ if (!lvActive || item == null) return;
             rt.anchorMin        = new Vector2(1f, 1f);
             rt.anchorMax        = new Vector2(1f, 1f);
             rt.pivot            = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-2f, -2f);
-            rt.sizeDelta        = new Vector2(18f, 18f);
+            rt.anchoredPosition = new Vector2(-5f, -5f);
+            rt.sizeDelta        = new Vector2(28f, 28f);
 
             var circleImg = badge.AddComponent<Image>();
             circleImg.color  = new Color(0.13f, 0.65f, 0.28f, 1f);
@@ -866,7 +936,7 @@ if (!lvActive || item == null) return;
             txtGo.transform.SetParent(badge.transform, false);
             var tmp = txtGo.AddComponent<TextMeshProUGUI>();
             tmp.text      = "✓";
-            tmp.fontSize  = 13f;
+            tmp.fontSize  = 18f;
             tmp.color     = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Bold;
@@ -990,7 +1060,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v1.9", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.0", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1126,6 +1196,16 @@ if (!lvActive || item == null) return;
                 acRow.GetComponentInChildren<Button>().onClick.AddListener(() => OnAutoCloseToggleClicked(idx));
             }
             RefreshAutoCloseToggles();
+
+            // ── COL 2: Weapons ────────────────────────────────────────────
+            var c2w = LCard(col2, "Weapons");
+
+            var (smRow, smImg, smThumb) = LToggleRow(c2w, "Skip melee on scroll",
+                "Scroll wheel skips the melee slot");
+            _skipMeleeToggleImage = smImg;
+            _skipMeleeToggleThumb = smThumb;
+            smRow.GetComponentInChildren<Button>().onClick.AddListener(OnSkipMeleeToggleClicked);
+            RefreshSkipMeleeToggle();
 
             // ── COL 3: Recorded Items ─────────────────────────────────────
             var c3fr = LCard(col3, "Recorded Items");
@@ -1637,6 +1717,215 @@ if (!lvActive || item == null) return;
         private void RefreshFpsToggle()
         {
             RefreshIOSToggle(_fpsToggleImage!, _fpsToggleThumb!, _showFps);
+        }
+
+        private void OnSkipMeleeToggleClicked()
+        {
+            _skipMeleeOnScroll = !_skipMeleeOnScroll;
+            PlayerPrefs.SetInt(PREF_SKIP_MELEE, _skipMeleeOnScroll ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshSkipMeleeToggle();
+        }
+
+        private void RefreshSkipMeleeToggle()
+        {
+            RefreshIOSToggle(_skipMeleeToggleImage!, _skipMeleeToggleThumb!, _skipMeleeOnScroll);
+        }
+
+        // ── ModConfig integration ─────────────────────────────────────────
+
+        private void TryInitModConfig()
+        {
+            if (_mcChecked) return;
+
+            // Step 1: find the ModConfigAPI type (one-time scan across all assemblies)
+            if (_mcAPI == null)
+            {
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    if (_mcAPI != null) break;
+                    Type[]? types = null;
+                    try { types = asm.GetTypes(); } catch { continue; }
+                    foreach (var t in types)
+                    {
+                        if (t?.Name == "ModConfigAPI") { _mcAPI = t; break; }
+                    }
+                }
+                if (_mcAPI == null) return; // ModConfig not installed
+            }
+
+            // Step 2: call Initialize() — returns false if ModConfig's ModBehaviour isn't running yet.
+            // Caller retries each frame via Update() until this returns true.
+            bool ready = false;
+            try
+            {
+                var initMethod = _mcAPI.GetMethod("Initialize", BindingFlags.Public | BindingFlags.Static);
+                ready = initMethod != null && (bool)(initMethod.Invoke(null, null) ?? false);
+            }
+            catch { }
+            if (!ready) return;
+
+            // Booleans
+            MCAddBool(PREF_ENABLED,          "Show sell value on hover",       _showValue);
+            MCAddBool(PREF_ENEMY_NAMES,      "Show enemy names",               _showEnemyNames);
+            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled",          _transferEnabled);
+            MCAddBool(PREF_AC_WASD,          "Auto-close on movement (WASD)",  _autoCloseOnWASD);
+            MCAddBool(PREF_AC_SHIFT,         "Auto-close on Shift",            _autoCloseOnShift);
+            MCAddBool(PREF_AC_SPACE,         "Auto-close on Space",            _autoCloseOnSpace);
+            MCAddBool(PREF_AC_DAMAGE,        "Auto-close on damage",           _autoCloseOnDamage);
+            MCAddBool(PREF_SLEEP_ENABLED,    "Sleep preset buttons",           _sleepPresetsEnabled);
+            MCAddBool(PREF_RECORDER_BADGE,   "Recorded items badge",           _showRecorderBadge);
+            MCAddBool(PREF_FPS_COUNTER,      "FPS counter",                    _showFps);
+
+            // Dropdowns
+            var modeOpts = new SortedDictionary<string, object>
+            {
+                { "Combined",    (int)DisplayMode.Combined    },
+                { "Single only", (int)DisplayMode.SingleOnly  },
+                { "Stack only",  (int)DisplayMode.StackOnly   },
+            };
+            MCAddDropdown(PREF_MODE, "Sell value display mode", modeOpts, typeof(int), (int)_mode);
+
+            var modOpts = new SortedDictionary<string, object>
+            {
+                { "Shift", (int)TransferModifier.Shift },
+                { "Alt",   (int)TransferModifier.Alt   },
+            };
+            MCAddDropdown(PREF_TRANSFER_MOD, "Transfer modifier key", modOpts, typeof(int), (int)_transferModifier);
+
+            // Sliders
+            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour",    typeof(int), _preset1Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min,  new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour",    typeof(int), _preset2Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min,  new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour",    typeof(int), _preset3Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min,  new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour",    typeof(int), _preset4Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min,  new Vector2(0, 50));
+
+            // Change delegate
+            try
+            {
+                _mcDelegate = OnModConfigChanged;
+                _mcAPI.GetMethod("SafeAddOnOptionsChangedDelegate",
+                        BindingFlags.Public | BindingFlags.Static, null,
+                        new[] { typeof(Action<string>) }, null)
+                    ?.Invoke(null, new object[] { _mcDelegate });
+            }
+            catch { }
+
+            _mcChecked = true; // Registration complete — stop retrying
+        }
+
+        private void OnModConfigChanged(string key)
+        {
+            if (_mcAPI == null) return;
+
+            if      (key == PREF_ENABLED)
+            { _showValue = MCLoadBool(key, _showValue); PlayerPrefs.SetInt(key, _showValue ? 1 : 0); RefreshToggleButton(); }
+            else if (key == PREF_MODE)
+            { _mode = (DisplayMode)MCLoadInt(key, (int)_mode); PlayerPrefs.SetInt(key, (int)_mode); RefreshModeButtons(); }
+            else if (key == PREF_ENEMY_NAMES)
+            { _showEnemyNames = MCLoadBool(key, _showEnemyNames); PlayerPrefs.SetInt(key, _showEnemyNames ? 1 : 0); RefreshEnemyNamesToggle(); }
+            else if (key == PREF_TRANSFER_ENABLED)
+            { _transferEnabled = MCLoadBool(key, _transferEnabled); PlayerPrefs.SetInt(key, _transferEnabled ? 1 : 0); RefreshTransferToggle(); RefreshShiftConflict(); }
+            else if (key == PREF_TRANSFER_MOD)
+            { _transferModifier = (TransferModifier)MCLoadInt(key, (int)_transferModifier); PlayerPrefs.SetInt(key, (int)_transferModifier); RefreshTransferModifierButtons(); }
+            else if (key == PREF_AC_WASD)
+            { _autoCloseOnWASD  = MCLoadBool(key, _autoCloseOnWASD);  PlayerPrefs.SetInt(key, _autoCloseOnWASD  ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
+            else if (key == PREF_AC_SHIFT)
+            { _autoCloseOnShift = MCLoadBool(key, _autoCloseOnShift); PlayerPrefs.SetInt(key, _autoCloseOnShift ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
+            else if (key == PREF_AC_SPACE)
+            { _autoCloseOnSpace = MCLoadBool(key, _autoCloseOnSpace); PlayerPrefs.SetInt(key, _autoCloseOnSpace ? 1 : 0); RefreshAutoCloseToggles(); }
+            else if (key == PREF_AC_DAMAGE)
+            { _autoCloseOnDamage = MCLoadBool(key, _autoCloseOnDamage); PlayerPrefs.SetInt(key, _autoCloseOnDamage ? 1 : 0); RefreshAutoCloseToggles(); }
+            else if (key == PREF_SLEEP_ENABLED)
+            { _sleepPresetsEnabled = MCLoadBool(key, _sleepPresetsEnabled); PlayerPrefs.SetInt(key, _sleepPresetsEnabled ? 1 : 0); RefreshSleepToggle(); }
+            else if (key == PREF_RECORDER_BADGE)
+            {
+                _showRecorderBadge = MCLoadBool(key, _showRecorderBadge);
+                PlayerPrefs.SetInt(key, _showRecorderBadge ? 1 : 0);
+                RefreshRecorderBadgeToggle();
+                if (!_showRecorderBadge) foreach (var kvp in _slotBadges) if (kvp.Value != null) kvp.Value.SetActive(false);
+            }
+            else if (key == PREF_FPS_COUNTER)
+            {
+                _showFps = MCLoadBool(key, _showFps);
+                PlayerPrefs.SetInt(key, _showFps ? 1 : 0);
+                RefreshFpsToggle();
+                if (!_showFps && _fpsCanvas != null) _fpsCanvas.SetActive(false);
+                else if (_showFps) { EnsureFpsCanvas(); _fpsCanvas!.SetActive(true); }
+            }
+            else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
+            {
+                _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
+                PlayerPrefs.SetInt(PREF_PRESET1H, _preset1Hour); PlayerPrefs.SetInt(PREF_PRESET1M, _preset1Min);
+                if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
+            }
+            else if (key == PREF_PRESET2H || key == PREF_PRESET2M)
+            {
+                _preset2Hour = MCLoadInt(PREF_PRESET2H, _preset2Hour); _preset2Min = MCLoadInt(PREF_PRESET2M, _preset2Min);
+                PlayerPrefs.SetInt(PREF_PRESET2H, _preset2Hour); PlayerPrefs.SetInt(PREF_PRESET2M, _preset2Min);
+                if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
+            }
+            else if (key == PREF_PRESET3H || key == PREF_PRESET3M)
+            {
+                _preset3Hour = MCLoadInt(PREF_PRESET3H, _preset3Hour); _preset3Min = MCLoadInt(PREF_PRESET3M, _preset3Min);
+                PlayerPrefs.SetInt(PREF_PRESET3H, _preset3Hour); PlayerPrefs.SetInt(PREF_PRESET3M, _preset3Min);
+                if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
+            }
+            else if (key == PREF_PRESET4H || key == PREF_PRESET4M)
+            {
+                _preset4Hour = MCLoadInt(PREF_PRESET4H, _preset4Hour); _preset4Min = MCLoadInt(PREF_PRESET4M, _preset4Min);
+                PlayerPrefs.SetInt(PREF_PRESET4H, _preset4Hour); PlayerPrefs.SetInt(PREF_PRESET4M, _preset4Min);
+                if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
+            }
+            PlayerPrefs.Save();
+        }
+
+        private void MCAddBool(string key, string desc, bool def)
+        {
+            try { _mcAPI!.GetMethod("SafeAddBoolDropdownList", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, def }); }
+            catch { }
+        }
+
+        private void MCAddDropdown(string key, string desc, SortedDictionary<string, object> options, Type valueType, object def)
+        {
+            try { _mcAPI!.GetMethod("SafeAddDropdownList", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, options, valueType, def }); }
+            catch { }
+        }
+
+        private void MCAddSlider(string key, string desc, Type valueType, object def, Vector2 range)
+        {
+            try { _mcAPI!.GetMethod("SafeAddInputWithSlider", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, valueType, def, (Vector2?)range }); }
+            catch { }
+        }
+
+        private bool MCLoadBool(string key, bool def)
+        {
+            try
+            {
+                var result = _mcAPI!.GetMethod("SafeLoad", BindingFlags.Public | BindingFlags.Static)
+                    ?.MakeGenericMethod(typeof(bool))
+                    .Invoke(null, new object[] { MC_MOD_NAME, key, def });
+                return result is bool b ? b : def;
+            }
+            catch { return def; }
+        }
+
+        private int MCLoadInt(string key, int def)
+        {
+            try
+            {
+                var result = _mcAPI!.GetMethod("SafeLoad", BindingFlags.Public | BindingFlags.Static)
+                    ?.MakeGenericMethod(typeof(int))
+                    .Invoke(null, new object[] { MC_MOD_NAME, key, def });
+                return result is int i ? i : def;
+            }
+            catch { return def; }
         }
 
         // ── Item Hover UI ─────────────────────────────────────────────────
