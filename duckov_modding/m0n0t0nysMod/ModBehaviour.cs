@@ -131,6 +131,16 @@ namespace AllInOneMod_m0n0t0ny
         private RectTransform? _skipMeleeToggleThumb;
         private CharacterMainControl? _playerCtrl;
 
+        // ── Auto-unload enemy weapons on loot-open ────────────────────────
+        private const string PREF_AUTO_UNLOAD = "DisplayItemValue_AutoUnload";
+        private bool _autoUnloadEnabled;
+        private Image? _autoUnloadToggleImage;
+        private RectTransform? _autoUnloadToggleThumb;
+        private int _lastAutoUnloadInvId;
+        private static PropertyInfo? _itemPlugsProp;
+        private static FieldInfo?    _itemPlugsField;
+        private static bool          _itemPlugsSearched;
+
         // ── ModConfig integration (optional) ─────────────────────────────
         private static Type?    _mcAPI;
         private bool            _mcChecked;
@@ -183,6 +193,7 @@ namespace AllInOneMod_m0n0t0ny
             _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
             _skipMeleeOnScroll   = PlayerPrefs.GetInt(PREF_SKIP_MELEE,     1) == 1;
+            _autoUnloadEnabled   = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,    1) == 1;
             CacheRecorderReflection();
             BuildSettingsPanel();
             TryInitModConfig();
@@ -313,6 +324,9 @@ namespace AllInOneMod_m0n0t0ny
                 }
             }
 
+            if (_autoUnloadEnabled)
+                TryAutoUnloadLoot();
+
             if (_showFps)
             {
                 _fpsDeltaAccum += Time.unscaledDeltaTime;
@@ -376,6 +390,108 @@ namespace AllInOneMod_m0n0t0ny
                 nameTMP.text = displayName;
                 nameTMP.gameObject.SetActive(true);
             }
+        }
+
+        // ── Auto-unload enemy weapons ─────────────────────────────────────
+        // Triggered when the player opens loot on an enemy — zero polling overhead.
+        // Scans items in the loot inventory and detaches any plugged sub-items
+        // (ammo, magazines) directly into that same inventory.
+
+        private void TryAutoUnloadLoot()
+        {
+            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
+            if (lv == null || !lv.gameObject.activeInHierarchy) return;
+
+            var lootInvDisplay = _lootTargetInvField?.GetValue(lv) as InventoryDisplay;
+            var lootInv = _invDisplayTargetProp?.GetValue(lootInvDisplay) as Inventory;
+            if (lootInv == null) return;
+
+            int invId = lootInv.GetInstanceID();
+            if (invId == _lastAutoUnloadInvId) return; // Already processed this loot session
+            _lastAutoUnloadInvId = invId;
+
+            var items = lootInv.Content?.ToList();
+            if (items == null) return;
+
+            foreach (var item in items)
+            {
+                if (item == null) continue;
+                var plugs = GetItemPlugs(item);
+                if (plugs == null || plugs.Count == 0) continue;
+                foreach (var plug in plugs)
+                {
+                    if (plug == null) continue;
+                    try { plug.Detach(); lootInv.AddItem(plug); } catch { }
+                }
+            }
+        }
+
+        // Discovers which field/property on Item holds plugged sub-items (ammo, mods).
+        // Scans by common name first, then by type. Result is cached after first call.
+        private static List<Item> GetItemPlugs(Item item)
+        {
+            if (!_itemPlugsSearched)
+            {
+                _itemPlugsSearched = true;
+                var type = typeof(Item);
+                var names = new[] {
+                    "plugs","Plugs","_plugs",
+                    "parts","Parts","_parts",
+                    "mods","Mods","_mods",
+                    "modules","Modules","_modules",
+                    "subItems","SubItems","_subItems",
+                    "children","Children","_children",
+                    "attachments","Attachments","_attachments",
+                    "slots","Slots","_slots",
+                    "items","Items","_items"
+                };
+                foreach (var name in names)
+                {
+                    var f = type.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (f != null && IsItemCollectionType(f.FieldType)) { _itemPlugsField = f; break; }
+                    var p = type.GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (p != null && IsItemCollectionType(p.PropertyType)) { _itemPlugsProp = p; break; }
+                }
+                // Fallback: scan all fields and properties by type
+                if (_itemPlugsField == null && _itemPlugsProp == null)
+                {
+                    foreach (var f in type.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                        if (IsItemCollectionType(f.FieldType)) { _itemPlugsField = f; break; }
+                    if (_itemPlugsField == null)
+                        foreach (var p in type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                            if (IsItemCollectionType(p.PropertyType)) { _itemPlugsProp = p; break; }
+                }
+            }
+
+            var results = new List<Item>();
+            object? raw = null;
+            try
+            {
+                if (_itemPlugsField != null) raw = _itemPlugsField.GetValue(item);
+                else if (_itemPlugsProp != null) raw = _itemPlugsProp.GetValue(item);
+            }
+            catch { return results; }
+
+            if (raw == null) return results;
+            if (raw is IEnumerable<Item> typed)
+                results.AddRange(typed.Where(i => i != null));
+            else if (raw is System.Collections.IEnumerable untyped)
+                foreach (var obj in untyped)
+                    if (obj is Item i) results.Add(i);
+            return results;
+        }
+
+        private static bool IsItemCollectionType(Type t)
+        {
+            if (t == typeof(string)) return false;
+            if (typeof(IEnumerable<Item>).IsAssignableFrom(t)) return true;
+            if (t.IsArray && t.GetElementType() == typeof(Item)) return true;
+            if (t.IsGenericType && typeof(System.Collections.IEnumerable).IsAssignableFrom(t))
+            {
+                var args = t.GetGenericArguments();
+                return args.Length == 1 && args[0] == typeof(Item);
+            }
+            return false;
         }
 
         // ── Shift-click transfer ──────────────────────────────────────────
@@ -589,16 +705,38 @@ if (!lvActive || item == null) return;
             go.name = $"P_{label}";
             if (template == null) go.transform.SetParent(row.transform, false);
 
+            // Remove the LayoutElement the original sleepBtn had (fixed preferredWidth / flexibleWidth=0)
+            // so the grid's HorizontalLayoutGroup can expand this clone freely
+            var inheritedLE = go.GetComponent<LayoutElement>();
+            if (inheritedLE != null) UnityEngine.Object.Destroy(inheritedLE);
+
             var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
             btn.onClick.RemoveAllListeners();
 
-            // Hide any icon children (moon icon etc.) — keep only the text child
-            foreach (var childImg in go.GetComponentsInChildren<Image>(true))
+            // Determine which Image Unity uses for color transitions (targetGraphic)
+            var targetImg = btn.targetGraphic as Image ?? go.GetComponent<Image>();
+            if (targetImg == null)
             {
-                if (childImg.gameObject == go) continue; // root background — keep
-                if (childImg.GetComponentInChildren<TextMeshProUGUI>(true) == null)
-                    childImg.gameObject.SetActive(false);
+                targetImg         = go.AddComponent<Image>();
+                btn.targetGraphic = targetImg;
             }
+
+            // Hide every Image that is NOT the targetGraphic and NOT an ancestor of a TMP label
+            foreach (var img in go.GetComponentsInChildren<Image>(true))
+            {
+                if (img == targetImg) continue;
+                if (img.GetComponentInChildren<TextMeshProUGUI>(true) != null) continue;
+                img.gameObject.SetActive(false);
+            }
+
+            // Apply preset colors: #88e1f7 normal, #d2f7ff hover
+            targetImg.color = Color.white; // ColorBlock drives the actual tint
+            var cols = btn.colors;
+            cols.normalColor      = new Color(0x88 / 255f, 0xe1 / 255f, 0xf7 / 255f, 1f);
+            cols.highlightedColor = new Color(0xd2 / 255f, 0xf7 / 255f, 0xff / 255f, 1f);
+            cols.pressedColor     = new Color(0x55 / 255f, 0xb8 / 255f, 0xd4 / 255f, 1f);
+            cols.colorMultiplier  = 1f;
+            btn.colors = cols;
 
             // Update (or create) the text label
             var tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
@@ -607,42 +745,17 @@ if (!lvActive || item == null) return;
                 var txtGo = new GameObject("T");
                 txtGo.transform.SetParent(go.transform, false);
                 tmp = txtGo.AddComponent<TextMeshProUGUI>();
-                tmp.color = Color.white;
                 var tr = txtGo.GetComponent<RectTransform>();
                 tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
                 tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
             }
             tmp.text               = label;
+            tmp.color              = Color.white;
             tmp.alignment          = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = false;
             tmp.enableAutoSizing   = true;
             tmp.fontSizeMin        = 6f;
             tmp.fontSizeMax        = tmp.fontSize > 0 ? tmp.fontSize : 20f;
-
-            if (template != null)
-            {
-                // Make our buttons show the same color as Sleep in its highlighted state
-                // (that's the bright cyan the user sees as "the Sleep button color").
-                // visibleColor = Image.color × activeStateColor  (Unity multiplicative tint)
-                var srcImg  = template.GetComponent<Image>();
-                var srcCols = template.colors;
-                var baseColor = srcImg != null ? srcImg.color : Color.white;
-
-                var clonedImg = go.GetComponent<Image>();
-                if (clonedImg != null) clonedImg.color = Color.white; // let ColorBlock drive the color
-
-                var cols = btn.colors;
-                cols.normalColor      = baseColor * srcCols.highlightedColor;
-                cols.highlightedColor = Color.white;
-                cols.pressedColor     = baseColor * srcCols.pressedColor;
-                btn.colors = cols;
-            }
-            else
-            {
-                var img = go.AddComponent<Image>();
-                img.color         = new Color(0.44f, 0.78f, 0.86f, 1f);
-                btn.targetGraphic = img;
-            }
 
             btn.onClick.AddListener(() =>
             {
@@ -1060,7 +1173,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.0", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.1", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1135,6 +1248,14 @@ if (!lvActive || item == null) return;
             _enemyNamesToggleThumb = enThumb;
             enRow.GetComponentInChildren<Button>().onClick.AddListener(OnEnemyNamesToggleClicked);
             RefreshEnemyNamesToggle();
+
+            var (auRow, auImg, auThumb) = LToggleRow(c1e, "Auto-unload gun on kill",
+                "Moves ammo to enemy stash when you kill them");
+            _autoUnloadToggleImage = auImg;
+            _autoUnloadToggleThumb = auThumb;
+            auRow.GetComponentInChildren<Button>().onClick.AddListener(OnAutoUnloadToggleClicked);
+            RefreshAutoUnloadToggle();
+
 
             // ── COL 1: Item Transfer ──────────────────────────────────────
             var c1t = LCard(col1, "Item Transfer");
@@ -1732,6 +1853,19 @@ if (!lvActive || item == null) return;
             RefreshIOSToggle(_skipMeleeToggleImage!, _skipMeleeToggleThumb!, _skipMeleeOnScroll);
         }
 
+        private void OnAutoUnloadToggleClicked()
+        {
+            _autoUnloadEnabled = !_autoUnloadEnabled;
+            PlayerPrefs.SetInt(PREF_AUTO_UNLOAD, _autoUnloadEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshAutoUnloadToggle();
+        }
+
+        private void RefreshAutoUnloadToggle()
+        {
+            RefreshIOSToggle(_autoUnloadToggleImage!, _autoUnloadToggleThumb!, _autoUnloadEnabled);
+        }
+
         // ── ModConfig integration ─────────────────────────────────────────
 
         private void TryInitModConfig()
@@ -1776,6 +1910,7 @@ if (!lvActive || item == null) return;
             MCAddBool(PREF_SLEEP_ENABLED,    "Sleep preset buttons",           _sleepPresetsEnabled);
             MCAddBool(PREF_RECORDER_BADGE,   "Recorded items badge",           _showRecorderBadge);
             MCAddBool(PREF_FPS_COUNTER,      "FPS counter",                    _showFps);
+            MCAddBool(PREF_AUTO_UNLOAD,      "Auto-unload gun on kill",        _autoUnloadEnabled);
 
             // Dropdowns
             var modeOpts = new SortedDictionary<string, object>
@@ -1856,6 +1991,8 @@ if (!lvActive || item == null) return;
                 if (!_showFps && _fpsCanvas != null) _fpsCanvas.SetActive(false);
                 else if (_showFps) { EnsureFpsCanvas(); _fpsCanvas!.SetActive(true); }
             }
+            else if (key == PREF_AUTO_UNLOAD)
+            { _autoUnloadEnabled = MCLoadBool(key, _autoUnloadEnabled); PlayerPrefs.SetInt(key, _autoUnloadEnabled ? 1 : 0); RefreshAutoUnloadToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);

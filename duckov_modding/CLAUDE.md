@@ -46,7 +46,7 @@
 | Namespace | `AllInOneMod_m0n0t0ny` |
 | Display name | `All In One - m0n0t0ny's Mod` |
 | Settings key | F9 |
-| Current version | 2.0 |
+| Current version | 2.1 |
 
 ## Feature list (keep in sync with info.ini description)
 
@@ -58,11 +58,15 @@
 - Recorded items badge: green badge (✓) on keys and blueprints already recorded (toggleable)
 - FPS counter: top-right corner (toggleable, OFF by default)
 - Skip melee on scroll: scroll wheel skips the melee slot; melee only equippable via V key (toggleable, ON by default)
+- Auto-unload on kill: when killing an enemy, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash (toggleable, ON by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
 
 ## Changelog
+
+### v2.1
+- Auto-unload on kill: when an enemy dies, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash; player can loot the bullets directly without manually unloading the weapon (ON by default, toggleable in F9)
 
 ### v2.0
 - Skip melee on scroll: scroll wheel weapon cycle now skips the melee slot (ON by default); melee can still be equipped via the dedicated V key
