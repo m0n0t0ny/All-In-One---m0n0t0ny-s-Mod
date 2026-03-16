@@ -26,7 +26,11 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_PRESET1H       = "DisplayItemValue_Preset1H";
         private const string PREF_PRESET1M       = "DisplayItemValue_Preset1M";
         private const string PREF_PRESET2H       = "DisplayItemValue_Preset2H";
-        private const string PREF_PRESET2M        = "DisplayItemValue_Preset2M";
+        private const string PREF_PRESET2M       = "DisplayItemValue_Preset2M";
+        private const string PREF_PRESET3H       = "DisplayItemValue_Preset3H";
+        private const string PREF_PRESET3M       = "DisplayItemValue_Preset3M";
+        private const string PREF_PRESET4H       = "DisplayItemValue_Preset4H";
+        private const string PREF_PRESET4M       = "DisplayItemValue_Preset4M";
         private const string PREF_ENEMY_NAMES       = "DisplayItemValue_EnemyNames";
         private const string PREF_TRANSFER_ENABLED  = "DisplayItemValue_TransferEnabled";
         private const string PREF_TRANSFER_MOD      = "DisplayItemValue_TransferMod";
@@ -98,10 +102,14 @@ namespace AllInOneMod_m0n0t0ny
         private bool _sleepPresetsEnabled;
         private int  _preset1Hour, _preset1Min;
         private int  _preset2Hour, _preset2Min;
+        private int  _preset3Hour, _preset3Min;
+        private int  _preset4Hour, _preset4Min;
         private SleepView? _sleepViewInstance;
         private bool _sleepPresetsInjected;
         private TextMeshProUGUI? _preset1BtnLabel;
         private TextMeshProUGUI? _preset2BtnLabel;
+        private TextMeshProUGUI? _preset3BtnLabel;
+        private TextMeshProUGUI? _preset4BtnLabel;
 
         // ── FPS counter ───────────────────────────────────────────────────
         private bool _showFps;
@@ -153,14 +161,25 @@ namespace AllInOneMod_m0n0t0ny
             _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
             _preset2Hour         = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
             _preset2Min          = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
+            _preset3Hour         = PlayerPrefs.GetInt(PREF_PRESET3H,  8);
+            _preset3Min          = PlayerPrefs.GetInt(PREF_PRESET3M,  0);
+            _preset4Hour         = PlayerPrefs.GetInt(PREF_PRESET4H, 12);
+            _preset4Min          = PlayerPrefs.GetInt(PREF_PRESET4M,  0);
             _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
             CacheRecorderReflection();
             BuildSettingsPanel();
         }
 
+        private void SetMenuVisible(bool open)
+        {
+            _settingsCanvas!.SetActive(open);
+            Time.timeScale = open ? 0f : 1f;
+        }
+
         void OnDestroy()
         {
+            Time.timeScale = 1f;
             if (_valueText != null) Destroy(_valueText.gameObject);
             if (_settingsCanvas != null) Destroy(_settingsCanvas);
             if (_fpsCanvas != null) Destroy(_fpsCanvas);
@@ -216,7 +235,7 @@ namespace AllInOneMod_m0n0t0ny
         void Update()
         {
             if (Input.GetKeyDown(MENU_KEY))
-                _settingsCanvas!.SetActive(!_settingsCanvas.activeSelf);
+                SetMenuVisible(!_settingsCanvas!.activeSelf);
 
             if (_sleepPresetsEnabled)
                 CheckSleepViewInjection();
@@ -404,6 +423,8 @@ if (!lvActive || item == null) return;
                 _sleepPresetsInjected = false;
                 _preset1BtnLabel      = null;
                 _preset2BtnLabel      = null;
+                _preset3BtnLabel      = null;
+                _preset4BtnLabel      = null;
             }
 
             if (!_sleepPresetsInjected && sv.gameObject.activeInHierarchy)
@@ -482,9 +503,11 @@ if (!lvActive || item == null) return;
             var row1 = MakePresetRow(presetGrid);
             _preset1BtnLabel = AddGridBtn(row1, sv, $"{_preset1Hour:D2}:{_preset1Min:D2}", () => MinutesUntilTime(_preset1Hour, _preset1Min), sleepImg);
             _preset2BtnLabel = AddGridBtn(row1, sv, $"{_preset2Hour:D2}:{_preset2Min:D2}", () => MinutesUntilTime(_preset2Hour, _preset2Min), sleepImg);
-            AddGridBtn(row1, sv, "Rain",      () => MinutesUntilRain(),    sleepImg);
+            _preset3BtnLabel = AddGridBtn(row1, sv, $"{_preset3Hour:D2}:{_preset3Min:D2}", () => MinutesUntilTime(_preset3Hour, _preset3Min), sleepImg);
+            _preset4BtnLabel = AddGridBtn(row1, sv, $"{_preset4Hour:D2}:{_preset4Min:D2}", () => MinutesUntilTime(_preset4Hour, _preset4Min), sleepImg);
 
             var row2 = MakePresetRow(presetGrid);
+            AddGridBtn(row2, sv, "Rain",       () => MinutesUntilRain(),     sleepImg);
             AddGridBtn(row2, sv, "Storm I",    () => MinutesUntilStorm(1),   sleepImg);
             AddGridBtn(row2, sv, "Storm II",   () => MinutesUntilStorm(2),   sleepImg);
             AddGridBtn(row2, sv, "Post-Storm", () => MinutesUntilStormEnd(), sleepImg);
@@ -858,8 +881,9 @@ if (!lvActive || item == null) return;
         private static Sprite GetOrCreateCircleSprite()
         {
             if (_circleSprite != null) return _circleSprite;
-            const int size = 64;
+            const int size = 256;
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
             float r = size / 2f;
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
@@ -877,9 +901,10 @@ if (!lvActive || item == null) return;
         private static Sprite GetOrCreateRoundedRectSprite()
         {
             if (_roundedRectSprite != null) return _roundedRectSprite;
-            const int size = 64;
-            const float r = 14f;
+            const int size = 256;
+            const float r = 56f; // same proportion as original 14/64
             var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
             for (int y = 0; y < size; y++)
                 for (int x = 0; x < size; x++)
                 {
@@ -890,19 +915,20 @@ if (!lvActive || item == null) return;
                 }
             tex.Apply();
             _roundedRectSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
-                100f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
+                400f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
             return _roundedRectSprite;
         }
 
-        // Pill sprite for toggle track — 48×24 with r=12 (= h/2), 9-sliced
-        // Borders 12+12=24 == target height 24 → zero vertical distortion
+        // Pill sprite for toggle track — 192×96 with r=48 (= h/2), 9-sliced
+        // Borders 48+48=96 == target height 96 → zero vertical distortion
         private static Sprite? _pillSprite;
         private static Sprite GetOrCreatePillSprite()
         {
             if (_pillSprite != null) return _pillSprite;
-            const int w = 48, h = 24;
-            const float r = 12f; // = h/2 → pure pill
+            const int w = 192, h = 96;
+            const float r = 48f; // = h/2 → pure pill
             var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
@@ -913,7 +939,7 @@ if (!lvActive || item == null) return;
                 }
             tex.Apply();
             _pillSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f),
-                100f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
+                400f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
             return _pillSprite;
         }
 
@@ -954,7 +980,7 @@ if (!lvActive || item == null) return;
             var header = LChild(panel, "Header", 54f);
             header.GetComponent<Image>().color = new Color(0.060f, 0.060f, 0.072f, 1f);
             var hHLG = header.AddComponent<HorizontalLayoutGroup>();
-            hHLG.padding              = new RectOffset(22, 22, 0, 0);
+            hHLG.padding              = new RectOffset(16, 16, 0, 0);
             hHLG.childAlignment       = TextAnchor.MiddleLeft;
             hHLG.childForceExpandHeight = true;
             hHLG.childForceExpandWidth  = false;
@@ -964,7 +990,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v1.8", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v1.9", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -972,13 +998,25 @@ if (!lvActive || item == null) return;
             var accent = LChild(panel, "Accent", 2f);
             accent.GetComponent<Image>().color = new Color(0f, 0.78f, 0.52f, 1f);
 
+            // ── Cards box — equal 16px padding on all four sides ─────────
+            var cardsBox = new GameObject("CardsBox");
+            cardsBox.transform.SetParent(panel.transform, false);
+            cardsBox.AddComponent<RectTransform>();
+            cardsBox.AddComponent<Image>().color = Color.clear;
+            var cbVLG = cardsBox.AddComponent<VerticalLayoutGroup>();
+            cbVLG.padding              = new RectOffset(16, 16, 16, 16);
+            cbVLG.spacing              = 0f;
+            cbVLG.childForceExpandWidth  = true;
+            cbVLG.childForceExpandHeight = false;
+            cardsBox.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
             // ── Three-column content area ─────────────────────────────────
             var content = new GameObject("Content");
-            content.transform.SetParent(panel.transform, false);
+            content.transform.SetParent(cardsBox.transform, false);
             content.AddComponent<RectTransform>();
             content.AddComponent<Image>().color = Color.clear;
             var cHLG = content.AddComponent<HorizontalLayoutGroup>();
-            cHLG.padding              = new RectOffset(16, 16, 16, 16);
+            cHLG.padding              = new RectOffset(0, 0, 0, 0);
             cHLG.spacing              = 12f;
             cHLG.childAlignment       = TextAnchor.UpperLeft;
             cHLG.childForceExpandWidth  = true;
@@ -1135,13 +1173,30 @@ if (!lvActive || item == null) return;
                 v => { _preset2Min  = v; PlayerPrefs.SetInt(PREF_PRESET2M, v); PlayerPrefs.Save();
                        if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; });
 
+            LPickerRow(c3sp, "Preset 3",
+                () => _preset3Hour,
+                v => { _preset3Hour = v; PlayerPrefs.SetInt(PREF_PRESET3H, v); PlayerPrefs.Save();
+                       if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}"; },
+                () => _preset3Min,
+                v => { _preset3Min  = v; PlayerPrefs.SetInt(PREF_PRESET3M, v); PlayerPrefs.Save();
+                       if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}"; });
+
+            LPickerRow(c3sp, "Preset 4",
+                () => _preset4Hour,
+                v => { _preset4Hour = v; PlayerPrefs.SetInt(PREF_PRESET4H, v); PlayerPrefs.Save();
+                       if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}"; },
+                () => _preset4Min,
+                v => { _preset4Min  = v; PlayerPrefs.SetInt(PREF_PRESET4M, v); PlayerPrefs.Save();
+                       if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}"; });
+
             // ── Bottom bar ────────────────────────────────────────────────
-            var bottom = LChild(panel, "Bottom", 46f);
+            var bottom = LChild(panel, "Bottom", 52f);
             bottom.GetComponent<Image>().color = new Color(0.040f, 0.040f, 0.050f, 1f);
             var bHLG = bottom.AddComponent<HorizontalLayoutGroup>();
-            bHLG.padding              = new RectOffset(22, 22, 8, 8);
+            bHLG.padding              = new RectOffset(16, 16, 10, 10);
             bHLG.spacing              = 10f;
-            bHLG.childForceExpandHeight = true;
+            bHLG.childAlignment       = TextAnchor.MiddleLeft;
+            bHLG.childForceExpandHeight = false;
             bHLG.childForceExpandWidth  = false;
 
             var closeGo = new GameObject("CloseBtn");
@@ -1151,8 +1206,10 @@ if (!lvActive || item == null) return;
             closeImg.sprite = GetOrCreateRoundedRectSprite();
             closeImg.type   = Image.Type.Sliced;
             closeImg.color  = new Color(0.55f, 0.10f, 0.10f, 1f);
-            closeGo.AddComponent<LayoutElement>().preferredWidth = 110f;
-            closeGo.AddComponent<Button>().onClick.AddListener(() => _settingsCanvas!.SetActive(false));
+            var closeLe = closeGo.AddComponent<LayoutElement>();
+            closeLe.preferredWidth  = 110f;
+            closeLe.preferredHeight = 32f;
+            closeGo.AddComponent<Button>().onClick.AddListener(() => SetMenuVisible(false));
             var cTxtGo = new GameObject("T");
             cTxtGo.transform.SetParent(closeGo.transform, false);
             var cTMP = cTxtGo.AddComponent<TextMeshProUGUI>();
@@ -1200,6 +1257,7 @@ if (!lvActive || item == null) return;
             go.AddComponent<RectTransform>();
             go.AddComponent<Image>().color = Color.clear;
             var vlg = go.AddComponent<VerticalLayoutGroup>();
+            vlg.childAlignment      = TextAnchor.UpperLeft;
             vlg.padding             = new RectOffset(0, 0, 0, 0);
             vlg.spacing             = 10f;
             vlg.childForceExpandWidth  = true;
@@ -1226,7 +1284,6 @@ if (!lvActive || item == null) return;
             vlg.spacing             = 6f;
             vlg.childForceExpandWidth  = true;
             vlg.childForceExpandHeight = false;
-            card.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Category label inside card
             var lbl = new GameObject("CardTitle");

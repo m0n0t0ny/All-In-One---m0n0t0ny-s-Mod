@@ -46,23 +46,25 @@
 | Namespace | `AllInOneMod_m0n0t0ny` |
 | Display name | `All In One - m0n0t0ny's Mod` |
 | Settings key | F9 |
-| Current version | 1.8 |
+| Current version | 1.9 |
 
 ## Feature list (keep in sync with info.ini description)
 
-- Shows item sell value on hover — always, not just in shops
-- Display mode: single price only / stack total only / combined (single / stack)
-- Shows enemy name above their health bar (toggleable)
-- Modifier+click (Shift or Alt, configurable) to transfer items between container and backpack (toggleable)
-- Auto-close open container on WASD / Shift / Space / damage received (each independently toggleable)
-- Sleep preset buttons: wake at 2 custom configurable times, until rain, Storm I, Storm II, post-storm
-- Recorded items badge: green checkmark on inventory slots for blueprints and keys already recorded
-- FPS counter in top-right corner (toggleable)
+- Item sell value on hover: shows sell price at any time, not just in shops (single / stack / combined display)
+- Enemy names: displays enemy name above health bar (toggleable)
+- Item transfer: Modifier+click (Shift or Alt, configurable) to move items between container and backpack (toggleable)
+- Auto-close container: closes on WASD / Shift / Space / damage received (each independently toggleable)
+- Sleep presets: wake at 4 custom configurable times, until rain, Storm I, Storm II, post-storm
+- Recorded items badge: green badge (✓) on keys and blueprints already recorded (toggleable)
+- FPS counter: top-right corner (toggleable, OFF by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
 
 ## Changelog
+
+### v1.9
+- Sleep presets expanded from 2 to 4 configurable custom times (Preset 3 default 08:00, Preset 4 default 12:00)
 
 ### v1.8
 - Added FPS counter: shows current FPS in the top-right corner of the screen (toggleable in F9 settings, OFF by default)
