@@ -46,7 +46,7 @@
 | Namespace | `AllInOneMod_m0n0t0ny` |
 | Display name | `All In One - m0n0t0ny's Mod` |
 | Settings key | F9 |
-| Current version | 1.9 |
+| Current version | 2.0 |
 
 ## Feature list (keep in sync with info.ini description)
 
@@ -57,11 +57,15 @@
 - Sleep presets: wake at 4 custom configurable times, until rain, Storm I, Storm II, post-storm
 - Recorded items badge: green badge (✓) on keys and blueprints already recorded (toggleable)
 - FPS counter: top-right corner (toggleable, OFF by default)
+- Skip melee on scroll: scroll wheel skips the melee slot; melee only equippable via V key (toggleable, ON by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
 
 ## Changelog
+
+### v2.0
+- Skip melee on scroll: scroll wheel weapon cycle now skips the melee slot (ON by default); melee can still be equipped via the dedicated V key
 
 ### v1.9
 - Sleep presets expanded from 2 to 4 configurable custom times (Preset 3 default 08:00, Preset 4 default 12:00)
