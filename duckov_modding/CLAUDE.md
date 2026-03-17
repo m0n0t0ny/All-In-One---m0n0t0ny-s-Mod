@@ -31,15 +31,29 @@
 
 6. **Add a changelog entry** at the top of the changelog section below.
 
-7. **Update the Steam Workshop page** — remind the user to:
-   - Upload the new DLL on the Workshop item page (Steamworks → Update)
-   - Update the Steam description to reflect the new/changed/removed feature (keep in sync with the feature list below)
-   - Post a release note on the Workshop changelog
-
-8. **Verify the F9 settings menu** reflects the new feature:
+7. **Verify the F9 settings menu** reflects the new feature:
    - If there is a new toggle or option, confirm it is visible in `BuildSettingsPanel()` in `ModBehaviour.cs`.
    - If a feature was removed, confirm its toggle/option was also removed from the settings panel.
    - If a default value changed, confirm the matching `PlayerPrefs.GetInt(..., default)` was updated in `Awake()`.
+
+---
+
+## Release workflow — when the user says "pubblica vX.Y"
+
+Execute ALL of the following steps automatically, without asking for confirmation:
+
+1. Bump the version to X.Y in all four places (both `info.ini`, `BuildSettingsPanel()`, `Mod info` table).
+2. Update the feature list in this file and in both `info.ini` descriptions to match the current state of the mod.
+3. Add a changelog entry for vX.Y at the top of the changelog section below.
+4. Build and install the DLL (steps 1–3 of "After EVERY code change").
+5. Print a ready-to-paste **Steam Workshop release block** containing:
+   - **Title**: `vX.Y — <one-line summary in English>`
+   - **Changelog body**: bullet list of changes (English)
+   - **Updated full Workshop description**: the complete feature list formatted for Steam (plain text, `|` separated)
+6. Remind the user to:
+   - Upload the new DLL via the Steamworks Workshop item page (Manage → Upload content)
+   - Paste the changelog body as a new release note
+   - Replace the Workshop description with the updated one
 
 ---
 
@@ -64,7 +78,7 @@
 - FPS counter: top-right corner (toggleable, OFF by default)
 - Skip melee on scroll: scroll wheel skips the melee slot; melee only equippable via V key (toggleable, ON by default)
 - Auto-unload on kill: when killing an enemy, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash (toggleable, ON by default)
-- Raid save backup: when entering a raid (Level_* scene), the active save is automatically copied to a `.pre_raid` backup; "Load pre-raid save" button in F9 restores it and loads scene 0 (main menu) (toggleable, ON by default)
+- Lootbox highlight: gold EPO outline on loot containers in the world; optional "only unsearched" filter (toggleable, ON by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
@@ -72,7 +86,10 @@
 ## Changelog
 
 ### v2.2
-- Raid save backup: automatically backs up the active save file when entering a raid (Level_* scene); "Load pre-raid save" button in F9 restores the backup and returns to main menu (scene 0); death state tracked via Condition_RaidDead component reflection (ON by default, toggleable in F9)
+- Lootbox highlight: gold EPO outline on all loot containers in the world (ON by default, toggleable in F9); optional "Only unsearched" sub-toggle hides outline on already-opened containers; outline cleared automatically on scene load
+- Fix: `TryInitModConfig()` was scanning all loaded assemblies every frame when ModConfig is not installed, causing severe FPS drops (15–28 FPS) even in the main menu; now scans once only
+- Fix: `FindObjectOfType<LootView>()` was called every frame by both AutoUnload and AutoClose, even when no container was open; replaced with a shared per-frame cache refreshed at most every 200ms
+- Fix: LootView cache timer was decremented twice per frame (once per caller); refactored to a single Update()-level resolution passed as parameter to both features
 
 ### v2.1
 - Auto-unload on kill: when an enemy dies, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash; player can loot the bullets directly without manually unloading the weapon (ON by default, toggleable in F9)

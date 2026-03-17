@@ -25,6 +25,9 @@
         <Reference Include="$(DuckovPath)$(SubPath)ItemStatsSystem.dll">
 	      <Private>False</Private>
 	    </Reference>
+        <Reference Include="$(DuckovPath)$(SubPath)EPO.dll">
+	      <Private>False</Private>
+	    </Reference>
         <Reference Include="$(DuckovPath)$(SubPath)Unity*">
 	      <Private>False</Private>
 	    </Reference>

@@ -6,9 +6,11 @@ using System.Text;
 using Duckov.UI;
 using Duckov.Utilities;
 using Duckov.Weathers;
+using EPOOutline;
 using ItemStatsSystem;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
@@ -76,6 +78,11 @@ namespace AllInOneMod_m0n0t0ny
         private PropertyInfo? _playerHealthValueProp;
         private float _playerHealthPrev = float.MaxValue;
         private float _damageInitTimer;
+
+        // ── LootView cache (shared by AutoUnload + AutoClose + Transfer) ──
+        private LootView? _cachedLootView;
+        private float     _lootViewCacheTimer; // counts down; refresh when <= 0
+        // Refreshed ONCE per frame in Update() — not per-caller.
 
         // ── Enemy name display ────────────────────────────────────────────
         private bool _showEnemyNames;
@@ -162,6 +169,25 @@ namespace AllInOneMod_m0n0t0ny
         private float _badgeScanTimer;
         private readonly Dictionary<int, GameObject> _slotBadges = new Dictionary<int, GameObject>();
 
+        // ── Lootbox Highlight ─────────────────────────────────────────────
+        private const string PREF_LOOTBOX_HL            = "DisplayItemValue_LootboxHL";
+        private const string PREF_LOOTBOX_HL_UNSEARCHED = "DisplayItemValue_LootboxHLUnsearched";
+        private bool _lootboxHLEnabled;
+        private bool _lootboxHLOnlyUnsearched;
+        private Image? _lootboxHLToggleImage;
+        private RectTransform? _lootboxHLToggleThumb;
+        private Image? _lootboxHLUnsearchedToggleImage;
+        private RectTransform? _lootboxHLUnsearchedToggleThumb;
+        // key = GameObject instanceID
+        private readonly Dictionary<int, Outlinable> _lootboxOutlines = new Dictionary<int, Outlinable>();
+        private float _lootboxScanTimer;
+        private float _lootboxUpdateTimer;
+        private static Type?      _lbType;              // InteractableLootbox
+        private static Type?      _imType;              // InteractMarker
+        private static FieldInfo? _imMarkedAsUsed;      // InteractMarker.markedAsUsed
+        private static FieldInfo? _invInspectedField;   // Inventory.hasBeenInspectedInLootBox
+        private static bool       _lbCached;
+
         TextMeshProUGUI ValueText
         {
             get
@@ -195,8 +221,11 @@ namespace AllInOneMod_m0n0t0ny
             _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
             _skipMeleeOnScroll   = PlayerPrefs.GetInt(PREF_SKIP_MELEE,     1) == 1;
-            _autoUnloadEnabled   = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,    1) == 1;
+            _autoUnloadEnabled       = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,         1) == 1;
+            _lootboxHLEnabled        = PlayerPrefs.GetInt(PREF_LOOTBOX_HL,          1) == 1;
+            _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
             CacheRecorderReflection();
+            EnsureLootboxTypes();
             BuildSettingsPanel();
             TryInitModConfig();
         }
@@ -225,6 +254,7 @@ namespace AllInOneMod_m0n0t0ny
             if (_valueText != null) Destroy(_valueText.gameObject);
             if (_settingsCanvas != null) Destroy(_settingsCanvas);
             if (_fpsCanvas != null) Destroy(_fpsCanvas);
+            ClearLootboxOutlines();
             foreach (var kvp in _slotBadges)
                 if (kvp.Value != null) Destroy(kvp.Value);
             _slotBadges.Clear();
@@ -266,12 +296,19 @@ namespace AllInOneMod_m0n0t0ny
         {
             ItemHoveringUI.onSetupItem += OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta += OnSetupMeta;
+            SceneManager.sceneLoaded   += OnSceneLoaded;
         }
 
         void OnDisable()
         {
             ItemHoveringUI.onSetupItem -= OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta -= OnSetupMeta;
+            SceneManager.sceneLoaded   -= OnSceneLoaded;
+        }
+
+        private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            ClearLootboxOutlines();
         }
 
         void Update()
@@ -308,26 +345,45 @@ namespace AllInOneMod_m0n0t0ny
                 _nameUpdateTimer -= Time.deltaTime;
                 if (_nameUpdateTimer <= 0f)
                 {
-                    _nameUpdateTimer = 0.15f;
+                    _nameUpdateTimer = 0.5f;
                     UpdateEnemyNameBars();
                 }
             }
 
+            // Resolve active LootView ONCE per frame — shared by AutoClose + AutoUnload.
+            // FindObjectOfType is throttled to max once every 0.2s via _lootViewCacheTimer.
+            LootView? activeLootView = null;
+            bool needsLootView = (_autoCloseOnWASD || _autoCloseOnShift || _autoCloseOnSpace || _autoCloseOnDamage) || _autoUnloadEnabled;
+            if (needsLootView)
+            {
+                _lootViewCacheTimer -= Time.deltaTime;
+                if (_lootViewCacheTimer <= 0f)
+                {
+                    _lootViewCacheTimer = 0.2f;
+                    _cachedLootView = LootView.Instance ?? FindObjectOfType<LootView>();
+                }
+                activeLootView = (_cachedLootView != null && _cachedLootView.gameObject.activeInHierarchy)
+                    ? _cachedLootView : null;
+            }
+
             if (_autoCloseOnWASD || _autoCloseOnShift || _autoCloseOnSpace || _autoCloseOnDamage)
-                CheckAutoCloseContainer();
+                CheckAutoCloseContainer(activeLootView);
 
             if (_showRecorderBadge)
             {
                 _badgeScanTimer -= Time.deltaTime;
                 if (_badgeScanTimer <= 0f)
                 {
-                    _badgeScanTimer = 0.5f;
+                    _badgeScanTimer = 1.0f;
                     ScanAndBadgeSlots();
                 }
             }
 
             if (_autoUnloadEnabled)
-                TryAutoUnloadLoot();
+                TryAutoUnloadLoot(activeLootView);
+
+            if (_lootboxHLEnabled)
+                UpdateLootboxHighlight();
 
             if (_showFps)
             {
@@ -399,10 +455,9 @@ namespace AllInOneMod_m0n0t0ny
         // Scans items in the loot inventory and detaches any plugged sub-items
         // (ammo, magazines) directly into that same inventory.
 
-        private void TryAutoUnloadLoot()
+        private void TryAutoUnloadLoot(LootView? lv)
         {
-            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
-            if (lv == null || !lv.gameObject.activeInHierarchy) return;
+            if (lv == null) return;
 
             var lootInvDisplay = _lootTargetInvField?.GetValue(lv) as InventoryDisplay;
             var lootInv = _invDisplayTargetProp?.GetValue(lootInvDisplay) as Inventory;
@@ -531,12 +586,129 @@ namespace AllInOneMod_m0n0t0ny
             return false;
         }
 
+        // ── Lootbox Highlight ─────────────────────────────────────────────
+
+        private static void EnsureLootboxTypes()
+        {
+            if (_lbCached) return;
+            _lbCached = true;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    foreach (var t in asm.GetTypes())
+                    {
+                        if (_lbType == null && t.Name == "InteractableLootbox" && typeof(Component).IsAssignableFrom(t))
+                            _lbType = t;
+                        if (_imType == null && t.Name == "InteractMarker" && typeof(Component).IsAssignableFrom(t))
+                        {
+                            _imType = t;
+                            _imMarkedAsUsed = t.GetField("markedAsUsed",
+                                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        }
+                        if (_invInspectedField == null && t.Name == "Inventory")
+                        {
+                            _invInspectedField = t.GetField("hasBeenInspectedInLootBox",
+                                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        }
+                        if (_lbType != null && _imType != null && _invInspectedField != null) return;
+                    }
+                }
+                catch { }
+            }
+        }
+
+        private void UpdateLootboxHighlight()
+        {
+            _lootboxScanTimer -= Time.deltaTime;
+            if (_lootboxScanTimer <= 0f)
+            {
+                _lootboxScanTimer = 5f;
+                ScanLootboxes();
+            }
+
+            _lootboxUpdateTimer -= Time.deltaTime;
+            if (_lootboxUpdateTimer <= 0f)
+            {
+                _lootboxUpdateTimer = 0.15f;
+                RefreshLootboxOutlines();
+            }
+        }
+
+        private void ScanLootboxes()
+        {
+            EnsureLootboxTypes();
+            if (_lbType == null) return;
+
+            foreach (UnityEngine.Object lb in FindObjectsOfType(_lbType))
+            {
+                var go = (lb as Component)?.gameObject;
+                if (go == null) continue;
+                int id = go.GetInstanceID();
+                if (_lootboxOutlines.ContainsKey(id)) continue;
+
+                var ol = go.GetComponent<Outlinable>() ?? go.AddComponent<Outlinable>();
+                ol.AddAllChildRenderersToRenderingList();
+                try { ol.OutlineParameters.Color = new Color(1f, 0.75f, 0f, 1f); } catch { }
+                ol.enabled = true;
+                _lootboxOutlines[id] = ol;
+            }
+        }
+
+        private void RefreshLootboxOutlines()
+        {
+            var toRemove = new List<int>();
+            foreach (var kvp in _lootboxOutlines)
+            {
+                var ol = kvp.Value;
+                if (ol == null) { toRemove.Add(kvp.Key); continue; }
+                var go = ol.gameObject;
+                if (go == null) { toRemove.Add(kvp.Key); continue; }
+
+                bool show = go.activeInHierarchy;
+                if (show && _lootboxHLOnlyUnsearched)
+                {
+                    bool searched = false;
+                    // 1. InteractMarker.markedAsUsed (may be on a child GO)
+                    if (_imType != null && _imMarkedAsUsed != null)
+                    {
+                        var marker = go.GetComponentInChildren(_imType);
+                        if (marker != null)
+                            try { searched = (bool)(_imMarkedAsUsed.GetValue(marker) ?? false); } catch { }
+                    }
+                    // 2. Fallback: Inventory.hasBeenInspectedInLootBox
+                    if (!searched && _invInspectedField != null)
+                    {
+                        var inv = go.GetComponentInChildren<Inventory>();
+                        if (inv != null)
+                            try { searched = (bool)(_invInspectedField.GetValue(inv) ?? false); } catch { }
+                    }
+                    show = !searched;
+                }
+                ol.enabled = show;
+            }
+            foreach (var k in toRemove) _lootboxOutlines.Remove(k);
+        }
+
+        private void ClearLootboxOutlines()
+        {
+            foreach (var ol in _lootboxOutlines.Values)
+            {
+                if (ol == null) continue;
+                ol.enabled = false;
+                try { Destroy(ol); } catch { }
+            }
+            _lootboxOutlines.Clear();
+            _lootboxScanTimer  = 0f;
+            _lootboxUpdateTimer = 0f;
+        }
+
         // ── Shift-click transfer ──────────────────────────────────────────
 
         private void TryShiftClickTransfer()
         {
-            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
-            bool lvActive = lv != null && lv.gameObject.activeInHierarchy;
+            var lv = (_cachedLootView != null && _cachedLootView.gameObject.activeInHierarchy) ? _cachedLootView : null;
+            bool lvActive = lv != null;
             var item = _transferCachedItem ?? _lastHoveredItem;
 if (!lvActive || item == null) return;
 
@@ -561,10 +733,9 @@ if (!lvActive || item == null) return;
 
         // ── Auto-close container ──────────────────────────────────────────
 
-        private void CheckAutoCloseContainer()
+        private void CheckAutoCloseContainer(LootView? lv)
         {
-            var lv = LootView.Instance ?? FindObjectOfType<LootView>();
-            if (lv == null || !lv.gameObject.activeInHierarchy) return;
+            if (lv == null) return;
 
             if (_autoCloseOnWASD &&
                 (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) ||
@@ -1192,7 +1363,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.3", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.2", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1346,6 +1517,23 @@ if (!lvActive || item == null) return;
             _skipMeleeToggleThumb = smThumb;
             smRow.GetComponentInChildren<Button>().onClick.AddListener(OnSkipMeleeToggleClicked);
             RefreshSkipMeleeToggle();
+
+            // ── COL 2: Lootbox Highlight ──────────────────────────────────
+            var c2lb = LCard(col2, "Lootbox Highlight");
+
+            var (lbRow, lbImg, lbThumb) = LToggleRow(c2lb, "Highlight loot containers",
+                "Gold outline on loot boxes in the world");
+            _lootboxHLToggleImage = lbImg;
+            _lootboxHLToggleThumb = lbThumb;
+            lbRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLToggleClicked);
+            RefreshLootboxHLToggle();
+
+            var (lbuRow, lbuImg, lbuThumb) = LToggleRow(c2lb, "Only unsearched",
+                "Hides outline on already-opened containers");
+            _lootboxHLUnsearchedToggleImage = lbuImg;
+            _lootboxHLUnsearchedToggleThumb = lbuThumb;
+            lbuRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLUnsearchedToggleClicked);
+            RefreshLootboxHLUnsearchedToggle();
 
             // ── COL 3: Recorded Items ─────────────────────────────────────
             var c3fr = LCard(col3, "Recorded Items");
@@ -1885,15 +2073,47 @@ if (!lvActive || item == null) return;
             RefreshIOSToggle(_autoUnloadToggleImage!, _autoUnloadToggleThumb!, _autoUnloadEnabled);
         }
 
+        private void OnLootboxHLToggleClicked()
+        {
+            _lootboxHLEnabled = !_lootboxHLEnabled;
+            PlayerPrefs.SetInt(PREF_LOOTBOX_HL, _lootboxHLEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshLootboxHLToggle();
+            if (!_lootboxHLEnabled) ClearLootboxOutlines();
+        }
+
+        private void RefreshLootboxHLToggle()
+        {
+            RefreshIOSToggle(_lootboxHLToggleImage!, _lootboxHLToggleThumb!, _lootboxHLEnabled);
+        }
+
+        private void OnLootboxHLUnsearchedToggleClicked()
+        {
+            _lootboxHLOnlyUnsearched = !_lootboxHLOnlyUnsearched;
+            PlayerPrefs.SetInt(PREF_LOOTBOX_HL_UNSEARCHED, _lootboxHLOnlyUnsearched ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshLootboxHLUnsearchedToggle();
+        }
+
+        private void RefreshLootboxHLUnsearchedToggle()
+        {
+            RefreshIOSToggle(_lootboxHLUnsearchedToggleImage!, _lootboxHLUnsearchedToggleThumb!, _lootboxHLOnlyUnsearched);
+        }
+
         // ── ModConfig integration ─────────────────────────────────────────
+
+        private bool _mcScanDone; // true after the one-time assembly scan
 
         private void TryInitModConfig()
         {
             if (_mcChecked) return;
 
-            // Step 1: find the ModConfigAPI type (one-time scan across all assemblies)
-            if (_mcAPI == null)
+            // Step 1: scan assemblies for ModConfigAPI — runs exactly ONCE.
+            // Previously, returning early when ModConfig was absent left _mcChecked = false,
+            // causing the expensive GetTypes() loop to run every single frame.
+            if (_mcAPI == null && !_mcScanDone)
             {
+                _mcScanDone = true;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
                     if (_mcAPI != null) break;
@@ -1904,8 +2124,9 @@ if (!lvActive || item == null) return;
                         if (t?.Name == "ModConfigAPI") { _mcAPI = t; break; }
                     }
                 }
-                if (_mcAPI == null) return; // ModConfig not installed
             }
+
+            if (_mcAPI == null) { _mcChecked = true; return; } // not installed — stop forever
 
             // Step 2: call Initialize() — returns false if ModConfig's ModBehaviour isn't running yet.
             // Caller retries each frame via Update() until this returns true.
@@ -1929,8 +2150,9 @@ if (!lvActive || item == null) return;
             MCAddBool(PREF_SLEEP_ENABLED,    "Sleep preset buttons",           _sleepPresetsEnabled);
             MCAddBool(PREF_RECORDER_BADGE,   "Recorded items badge",           _showRecorderBadge);
             MCAddBool(PREF_FPS_COUNTER,      "FPS counter",                    _showFps);
-            MCAddBool(PREF_AUTO_UNLOAD,        "Auto-unload gun on kill",          _autoUnloadEnabled);
-
+            MCAddBool(PREF_AUTO_UNLOAD,            "Auto-unload gun on kill",            _autoUnloadEnabled);
+            MCAddBool(PREF_LOOTBOX_HL,             "Lootbox highlight",                  _lootboxHLEnabled);
+            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED,  "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
             // Dropdowns
             var modeOpts = new SortedDictionary<string, object>
             {
@@ -2012,6 +2234,10 @@ if (!lvActive || item == null) return;
             }
             else if (key == PREF_AUTO_UNLOAD)
             { _autoUnloadEnabled = MCLoadBool(key, _autoUnloadEnabled); PlayerPrefs.SetInt(key, _autoUnloadEnabled ? 1 : 0); RefreshAutoUnloadToggle(); }
+            else if (key == PREF_LOOTBOX_HL)
+            { _lootboxHLEnabled = MCLoadBool(key, _lootboxHLEnabled); PlayerPrefs.SetInt(key, _lootboxHLEnabled ? 1 : 0); RefreshLootboxHLToggle(); if (!_lootboxHLEnabled) ClearLootboxOutlines(); }
+            else if (key == PREF_LOOTBOX_HL_UNSEARCHED)
+            { _lootboxHLOnlyUnsearched = MCLoadBool(key, _lootboxHLOnlyUnsearched); PlayerPrefs.SetInt(key, _lootboxHLOnlyUnsearched ? 1 : 0); RefreshLootboxHLUnsearchedToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
