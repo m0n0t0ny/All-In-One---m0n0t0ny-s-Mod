@@ -31,7 +31,12 @@
 
 6. **Add a changelog entry** at the top of the changelog section below.
 
-7. **Verify the F9 settings menu** reflects the new feature:
+7. **Update the Steam Workshop page** — remind the user to:
+   - Upload the new DLL on the Workshop item page (Steamworks → Update)
+   - Update the Steam description to reflect the new/changed/removed feature (keep in sync with the feature list below)
+   - Post a release note on the Workshop changelog
+
+8. **Verify the F9 settings menu** reflects the new feature:
    - If there is a new toggle or option, confirm it is visible in `BuildSettingsPanel()` in `ModBehaviour.cs`.
    - If a feature was removed, confirm its toggle/option was also removed from the settings panel.
    - If a default value changed, confirm the matching `PlayerPrefs.GetInt(..., default)` was updated in `Awake()`.
