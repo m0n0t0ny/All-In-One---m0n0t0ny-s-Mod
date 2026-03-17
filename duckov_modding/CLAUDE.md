@@ -46,7 +46,7 @@
 | Namespace | `AllInOneMod_m0n0t0ny` |
 | Display name | `All In One - m0n0t0ny's Mod` |
 | Settings key | F9 |
-| Current version | 2.1 |
+| Current version | 2.2 |
 
 ## Feature list (keep in sync with info.ini description)
 
@@ -59,11 +59,15 @@
 - FPS counter: top-right corner (toggleable, OFF by default)
 - Skip melee on scroll: scroll wheel skips the melee slot; melee only equippable via V key (toggleable, ON by default)
 - Auto-unload on kill: when killing an enemy, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash (toggleable, ON by default)
+- Raid save backup: when entering a raid (Level_* scene), the active save is automatically copied to a `.pre_raid` backup; "Load pre-raid save" button in F9 restores it and loads scene 0 (main menu) (toggleable, ON by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
 
 ## Changelog
+
+### v2.2
+- Raid save backup: automatically backs up the active save file when entering a raid (Level_* scene); "Load pre-raid save" button in F9 restores the backup and returns to main menu (scene 0); death state tracked via Condition_RaidDead component reflection (ON by default, toggleable in F9)
 
 ### v2.1
 - Auto-unload on kill: when an enemy dies, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash; player can loot the bullets directly without manually unloading the weapon (ON by default, toggleable in F9)

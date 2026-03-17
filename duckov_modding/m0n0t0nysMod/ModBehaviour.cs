@@ -11,6 +11,8 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using UnityEngine.SceneManagement;
+using System.IO;
 
 namespace AllInOneMod_m0n0t0ny
 {
@@ -140,6 +142,30 @@ namespace AllInOneMod_m0n0t0ny
         private static PropertyInfo? _itemPlugsProp;
         private static FieldInfo?    _itemPlugsField;
         private static bool          _itemPlugsSearched;
+        private static PropertyInfo? _stackCountProp;
+        private static bool          _stackCountSearched;
+
+        // ── Raid Save Backup ──────────────────────────────────────────────
+        private const string PREF_RAID_BACKUP_ENABLED = "DisplayItemValue_RaidBackupEnabled";
+        private bool _raidBackupEnabled;
+        private bool _raidBackupAvailable;
+        private Image? _raidBackupToggleImage;
+        private RectTransform? _raidBackupToggleThumb;
+        private TextMeshProUGUI? _raidBackupStatusTMP;
+        private Button? _raidRestoreBtn;
+        private bool _inRaid;
+        private bool _playerDiedInRaid;
+        private Component? _condRaidDeadComp;
+        private PropertyInfo? _condRaidDeadProp;
+        private float _condRaidDeadTimer;
+        // Raid state detection via reflection
+        private static MethodInfo? _isRaidMapGetter;     // bool property IsRaidMap getter
+        private static object?     _isRaidMapInstance;   // null = static
+        private static bool        _isRaidMapSearched;
+        private static Delegate?   _onNewRaidDelegate;   // cached to unsubscribe
+        private static EventInfo?  _onNewRaidEvent;
+        private static bool        _onNewRaidSearched;
+        private float _raidStateTimer;                   // polling interval
 
         // ── ModConfig integration (optional) ─────────────────────────────
         private static Type?    _mcAPI;
@@ -194,6 +220,10 @@ namespace AllInOneMod_m0n0t0ny
             _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
             _skipMeleeOnScroll   = PlayerPrefs.GetInt(PREF_SKIP_MELEE,     1) == 1;
             _autoUnloadEnabled   = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,    1) == 1;
+            _raidBackupEnabled   = PlayerPrefs.GetInt(PREF_RAID_BACKUP_ENABLED, 1) == 1;
+            var savesDir = Path.Combine(Application.persistentDataPath, "Saves");
+            _raidBackupAvailable = Directory.Exists(savesDir) && Directory.GetFiles(savesDir, "*.pre_raid").Length > 0;
+            if (_raidBackupEnabled) TrySubscribeOnNewRaid();
             CacheRecorderReflection();
             BuildSettingsPanel();
             TryInitModConfig();
@@ -208,6 +238,11 @@ namespace AllInOneMod_m0n0t0ny
         void OnDestroy()
         {
             Time.timeScale = 1f;
+            if (_onNewRaidDelegate != null && _onNewRaidEvent != null)
+            {
+                try { _onNewRaidEvent.RemoveEventHandler(null, _onNewRaidDelegate); } catch { }
+                _onNewRaidDelegate = null;
+            }
             if (_mcDelegate != null && _mcAPI != null)
             {
                 try
@@ -327,6 +362,18 @@ namespace AllInOneMod_m0n0t0ny
             if (_autoUnloadEnabled)
                 TryAutoUnloadLoot();
 
+            if (_raidBackupEnabled)
+            {
+                _raidStateTimer -= Time.unscaledDeltaTime;
+                if (_raidStateTimer <= 0f)
+                {
+                    _raidStateTimer = 2f;
+                    PollRaidState();
+                }
+                if (_inRaid && !_playerDiedInRaid)
+                    CheckRaidDead();
+            }
+
             if (_showFps)
             {
                 _fpsDeltaAccum += Time.unscaledDeltaTime;
@@ -421,9 +468,44 @@ namespace AllInOneMod_m0n0t0ny
                 foreach (var plug in plugs)
                 {
                     if (plug == null) continue;
-                    try { plug.Detach(); lootInv.AddItem(plug); } catch { }
+                    try
+                    {
+                        plug.Detach();
+                        if (!TryMergeStack(plug, lootInv))
+                            lootInv.AddItem(plug);
+                    }
+                    catch { }
                 }
             }
+        }
+
+        // Merges plug into an existing same-type stack in the inventory.
+        // Returns true if merged (plug is consumed); false if AddItem should be called instead.
+        private static bool TryMergeStack(Item plug, Inventory inv)
+        {
+            if (!_stackCountSearched)
+            {
+                _stackCountSearched = true;
+                var p = typeof(Item).GetProperty("StackCount", BindingFlags.Public | BindingFlags.Instance);
+                if (p != null && p.CanWrite) _stackCountProp = p;
+            }
+            if (_stackCountProp == null) return false;
+
+            int plugCount;
+            try { plugCount = (int)(_stackCountProp.GetValue(plug) ?? 0); }
+            catch { return false; }
+            if (plugCount <= 0) return false;
+
+            var target = inv.Content?.FirstOrDefault(i => i != null && i != plug && i.GetType() == plug.GetType());
+            if (target == null) return false;
+
+            try
+            {
+                int existingCount = (int)(_stackCountProp.GetValue(target) ?? 0);
+                _stackCountProp.SetValue(target, existingCount + plugCount);
+                return true;
+            }
+            catch { return false; }
         }
 
         // Discovers which field/property on Item holds plugged sub-items (ammo, mods).
@@ -698,39 +780,22 @@ if (!lvActive || item == null) return;
 
         private static TextMeshProUGUI AddGridBtn(GameObject row, SleepView sv, string label, Func<float?> getMinutes, Button? template)
         {
-            // Clone the native Sleep button so appearance is identical
-            var go  = template != null
-                ? UnityEngine.Object.Instantiate(template.gameObject, row.transform, false)
-                : new GameObject($"P_{label}");
-            go.name = $"P_{label}";
-            if (template == null) go.transform.SetParent(row.transform, false);
+            // Build from scratch — steal only the sprite from the Sleep button for rounded corners
+            var go = new GameObject($"P_{label}");
+            go.transform.SetParent(row.transform, false);
 
-            // Remove the LayoutElement the original sleepBtn had (fixed preferredWidth / flexibleWidth=0)
-            // so the grid's HorizontalLayoutGroup can expand this clone freely
-            var inheritedLE = go.GetComponent<LayoutElement>();
-            if (inheritedLE != null) UnityEngine.Object.Destroy(inheritedLE);
+            // Background Image — use the targetGraphic sprite for rounded corners,
+            // falling back to the procedural rounded-rect sprite already in the mod
+            var img = go.AddComponent<Image>();
+            var templateImg = (template?.targetGraphic as Image)
+                           ?? template?.GetComponentInChildren<Image>(true);
+            img.sprite = templateImg?.sprite ?? GetOrCreateRoundedRectSprite();
+            img.type   = templateImg?.sprite != null ? templateImg.type : Image.Type.Sliced;
+            img.color  = Color.white;
 
-            var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
-            btn.onClick.RemoveAllListeners();
-
-            // Determine which Image Unity uses for color transitions (targetGraphic)
-            var targetImg = btn.targetGraphic as Image ?? go.GetComponent<Image>();
-            if (targetImg == null)
-            {
-                targetImg         = go.AddComponent<Image>();
-                btn.targetGraphic = targetImg;
-            }
-
-            // Hide every Image that is NOT the targetGraphic and NOT an ancestor of a TMP label
-            foreach (var img in go.GetComponentsInChildren<Image>(true))
-            {
-                if (img == targetImg) continue;
-                if (img.GetComponentInChildren<TextMeshProUGUI>(true) != null) continue;
-                img.gameObject.SetActive(false);
-            }
-
-            // Apply preset colors: #88e1f7 normal, #d2f7ff hover
-            targetImg.color = Color.white; // ColorBlock drives the actual tint
+            // Button with game-matching colors: #88e1f7 normal, #d2f7ff hover
+            var btn = go.AddComponent<Button>();
+            btn.targetGraphic = img;
             var cols = btn.colors;
             cols.normalColor      = new Color(0x88 / 255f, 0xe1 / 255f, 0xf7 / 255f, 1f);
             cols.highlightedColor = new Color(0xd2 / 255f, 0xf7 / 255f, 0xff / 255f, 1f);
@@ -738,24 +803,23 @@ if (!lvActive || item == null) return;
             cols.colorMultiplier  = 1f;
             btn.colors = cols;
 
-            // Update (or create) the text label
-            var tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (tmp == null)
-            {
-                var txtGo = new GameObject("T");
-                txtGo.transform.SetParent(go.transform, false);
-                tmp = txtGo.AddComponent<TextMeshProUGUI>();
-                var tr = txtGo.GetComponent<RectTransform>();
-                tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-                tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-            }
+            // Text label — copy font from Sleep button's text if available
+            var txtGo = new GameObject("T");
+            txtGo.transform.SetParent(go.transform, false);
+            var tmp = txtGo.AddComponent<TextMeshProUGUI>();
+            var tr = txtGo.GetComponent<RectTransform>();
+            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
+            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+
+            var sleepTxt = template?.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (sleepTxt != null) { tmp.font = sleepTxt.font; tmp.fontStyle = sleepTxt.fontStyle; tmp.color = sleepTxt.color; }
+            else { tmp.color = Color.white; }
             tmp.text               = label;
-            tmp.color              = Color.white;
             tmp.alignment          = TextAlignmentOptions.Center;
             tmp.enableWordWrapping = false;
             tmp.enableAutoSizing   = true;
             tmp.fontSizeMin        = 6f;
-            tmp.fontSizeMax        = tmp.fontSize > 0 ? tmp.fontSize : 20f;
+            tmp.fontSizeMax        = 20f;
 
             btn.onClick.AddListener(() =>
             {
@@ -1173,7 +1237,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.1", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.2", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1317,6 +1381,57 @@ if (!lvActive || item == null) return;
                 acRow.GetComponentInChildren<Button>().onClick.AddListener(() => OnAutoCloseToggleClicked(idx));
             }
             RefreshAutoCloseToggles();
+
+            // ── COL 2: Raid Backup ────────────────────────────────────────
+            var c2rb = LCard(col2, "Raid Backup");
+
+            var (rbRow, rbImg, rbThumb) = LToggleRow(c2rb, "Auto-backup on raid entry",
+                "Saves a copy of your progress before each raid");
+            _raidBackupToggleImage = rbImg;
+            _raidBackupToggleThumb = rbThumb;
+            rbRow.GetComponentInChildren<Button>().onClick.AddListener(OnRaidBackupToggleClicked);
+            RefreshRaidBackupToggle();
+
+            // Status text
+            var rbStatusGo = new GameObject("RaidBackupStatus");
+            rbStatusGo.transform.SetParent(c2rb.transform, false);
+            rbStatusGo.AddComponent<RectTransform>();
+            _raidBackupStatusTMP = rbStatusGo.AddComponent<TextMeshProUGUI>();
+            _raidBackupStatusTMP.fontSize = 9.5f;
+            _raidBackupStatusTMP.color    = new Color(0.5f, 0.5f, 0.62f, 1f);
+            rbStatusGo.AddComponent<LayoutElement>().preferredHeight = 14f;
+
+            // Restore button
+            var rbBtnGo = new GameObject("RaidRestoreBtn");
+            rbBtnGo.transform.SetParent(c2rb.transform, false);
+            rbBtnGo.AddComponent<RectTransform>();
+            var rbBtnImg = rbBtnGo.AddComponent<Image>();
+            rbBtnImg.sprite = GetOrCreateRoundedRectSprite();
+            rbBtnImg.type   = Image.Type.Sliced;
+            var rbBtnLe = rbBtnGo.AddComponent<LayoutElement>();
+            rbBtnLe.preferredHeight = 30f;
+            _raidRestoreBtn = rbBtnGo.AddComponent<Button>();
+            _raidRestoreBtn.targetGraphic = rbBtnImg;
+            var rbBtnCols = _raidRestoreBtn.colors;
+            rbBtnCols.normalColor      = new Color(0.55f, 0.18f, 0.18f, 1f);
+            rbBtnCols.highlightedColor = new Color(0.72f, 0.24f, 0.24f, 1f);
+            rbBtnCols.pressedColor     = new Color(0.38f, 0.12f, 0.12f, 1f);
+            rbBtnCols.disabledColor    = new Color(0.22f, 0.22f, 0.28f, 0.6f);
+            rbBtnCols.colorMultiplier  = 1f;
+            _raidRestoreBtn.colors = rbBtnCols;
+            _raidRestoreBtn.onClick.AddListener(RestoreRaidBackup);
+            var rbBtnTxtGo = new GameObject("T");
+            rbBtnTxtGo.transform.SetParent(rbBtnGo.transform, false);
+            var rbBtnTMP = rbBtnTxtGo.AddComponent<TextMeshProUGUI>();
+            rbBtnTMP.text      = "Load pre-raid save";
+            rbBtnTMP.fontSize  = 11f;
+            rbBtnTMP.color     = Color.white;
+            rbBtnTMP.alignment = TextAlignmentOptions.Center;
+            var rbBtnTr = rbBtnTxtGo.GetComponent<RectTransform>();
+            rbBtnTr.anchorMin = Vector2.zero; rbBtnTr.anchorMax = Vector2.one;
+            rbBtnTr.sizeDelta = Vector2.zero; rbBtnTr.anchoredPosition = Vector2.zero;
+
+            RefreshRaidBackupUI();
 
             // ── COL 2: Weapons ────────────────────────────────────────────
             var c2w = LCard(col2, "Weapons");
@@ -1866,6 +1981,264 @@ if (!lvActive || item == null) return;
             RefreshIOSToggle(_autoUnloadToggleImage!, _autoUnloadToggleThumb!, _autoUnloadEnabled);
         }
 
+        // ── Raid Save Backup ──────────────────────────────────────────────
+
+        private void OnRaidBackupToggleClicked()
+        {
+            _raidBackupEnabled = !_raidBackupEnabled;
+            PlayerPrefs.SetInt(PREF_RAID_BACKUP_ENABLED, _raidBackupEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshRaidBackupToggle();
+        }
+
+        private void RefreshRaidBackupToggle()
+        {
+            RefreshIOSToggle(_raidBackupToggleImage!, _raidBackupToggleThumb!, _raidBackupEnabled);
+        }
+
+        private void RefreshRaidBackupUI()
+        {
+            if (_raidRestoreBtn != null)
+                _raidRestoreBtn.interactable = _raidBackupAvailable;
+
+            if (_raidBackupStatusTMP == null) return;
+
+            if (_raidBackupAvailable)
+            {
+                try
+                {
+                    var savesDir = Path.Combine(Application.persistentDataPath, "Saves");
+                    var files    = Directory.GetFiles(savesDir, "*.pre_raid");
+                    if (files.Length > 0)
+                    {
+                        var t    = File.GetLastWriteTime(files[0]);
+                        var slot = Path.GetFileName(files[0]).Replace(".sav.pre_raid", "");
+                        _raidBackupStatusTMP.text = $"Backup ({slot}): {t:dd/MM HH:mm}";
+                        return;
+                    }
+                }
+                catch { }
+            }
+            _raidBackupStatusTMP.text = "No backup available";
+        }
+
+        // ── Raid entry/exit detection (reflection-based, no scene name needed) ──
+
+        private void TrySubscribeOnNewRaid()
+        {
+            if (_onNewRaidSearched) return;
+            _onNewRaidSearched = true;
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var fn = asm.FullName ?? "";
+                if (fn.StartsWith("UnityEngine") || fn.StartsWith("System") ||
+                    fn.StartsWith("Mono") || fn.StartsWith("mscorlib") || fn.StartsWith("Unity.")) continue;
+                Type[]? types = null;
+                try { types = asm.GetTypes(); } catch { continue; }
+                foreach (var t in types)
+                {
+                    if (t == null) continue;
+                    var ev = t.GetEvent("OnNewRaid", BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
+                    if (ev == null) continue;
+                    try
+                    {
+                        // Only subscribe if handler is zero-arg (Action)
+                        var invokeParams = ev.EventHandlerType?.GetMethod("Invoke")?.GetParameters();
+                        if (invokeParams?.Length == 0)
+                        {
+                            var del = new Action(OnNewRaidFired);
+                            ev.AddEventHandler(null, del);
+                            _onNewRaidDelegate = del;
+                            _onNewRaidEvent    = ev;
+                            Debug.Log("[m0n0t0ny] Subscribed to OnNewRaid");
+                        }
+                    }
+                    catch { }
+                    return; // found the event, stop searching
+                }
+            }
+        }
+
+        private void TryFindIsRaidMap()
+        {
+            if (_isRaidMapSearched) return;
+            _isRaidMapSearched = true;
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                var fn = asm.FullName ?? "";
+                if (fn.StartsWith("UnityEngine") || fn.StartsWith("System") ||
+                    fn.StartsWith("Mono") || fn.StartsWith("mscorlib") || fn.StartsWith("Unity.")) continue;
+                Type[]? types = null;
+                try { types = asm.GetTypes(); } catch { continue; }
+                foreach (var t in types)
+                {
+                    if (t == null) continue;
+                    var prop = t.GetProperty("IsRaidMap",
+                        BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (prop?.PropertyType != typeof(bool)) continue;
+                    _isRaidMapGetter = prop.GetGetMethod(true);
+                    if (!_isRaidMapGetter!.IsStatic && typeof(Component).IsAssignableFrom(t))
+                        _isRaidMapInstance = FindObjectOfType(t);
+                    return;
+                }
+            }
+        }
+
+        // Called every 2 seconds. Detects raid entry/exit without relying on scene names.
+        private void PollRaidState()
+        {
+            TrySubscribeOnNewRaid();
+            TryFindIsRaidMap();
+
+            bool isRaid = DetectIsInRaid();
+
+            if (isRaid && !_inRaid)
+                OnRaidEntered();
+            else if (!isRaid && _inRaid)
+                OnRaidExited();
+        }
+
+        private bool DetectIsInRaid()
+        {
+            // 1. IsRaidMap property (most reliable if found)
+            if (_isRaidMapGetter != null)
+            {
+                try { return (bool)(_isRaidMapGetter.Invoke(_isRaidMapInstance, null) ?? (object)false); }
+                catch { _isRaidMapGetter = null; }
+            }
+
+            // 2. Presence of Condition_RaidDead on main character
+            foreach (var ch in FindObjectsOfType<CharacterMainControl>())
+            {
+                if (!ch.IsMainCharacter) continue;
+                foreach (var comp in ch.GetComponents<Component>())
+                    if (comp.GetType().Name == "Condition_RaidDead") return true;
+                return false; // main char found but no Condition_RaidDead → hub
+            }
+            return false; // no main character → loading or menu
+        }
+
+        private void OnNewRaidFired()
+        {
+            // Fired immediately when a new raid starts (from the OnNewRaid event)
+            if (!_inRaid)
+                OnRaidEntered();
+        }
+
+        private void OnRaidEntered()
+        {
+            _inRaid            = true;
+            _playerDiedInRaid  = false;
+            _condRaidDeadComp  = null;
+            _condRaidDeadProp  = null;
+            _condRaidDeadTimer = 0f;
+            CreateRaidBackup();
+        }
+
+        private void OnRaidExited()
+        {
+            _inRaid           = false;
+            _playerDiedInRaid = false;
+        }
+
+        private void CreateRaidBackup()
+        {
+            try
+            {
+                var savesDir = Path.Combine(Application.persistentDataPath, "Saves");
+                if (!Directory.Exists(savesDir)) return;
+
+                // Remove old pre-raid backups
+                foreach (var old in Directory.GetFiles(savesDir, "*.pre_raid"))
+                    File.Delete(old);
+
+                // Most recently written Save_N.sav (exact .sav extension, no .bac etc.)
+                var savFiles = Directory.GetFiles(savesDir, "Save_*.sav")
+                    .Where(f => string.Equals(Path.GetExtension(f), ".sav", StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(File.GetLastWriteTimeUtc)
+                    .ToArray();
+
+                if (savFiles.Length == 0) return;
+
+                var srcPath = savFiles[0];
+                var dstPath = srcPath + ".pre_raid";
+                File.Copy(srcPath, dstPath, overwrite: true);
+
+                _raidBackupAvailable = true;
+                RefreshRaidBackupUI();
+                Debug.Log($"[m0n0t0ny] Pre-raid backup created: {Path.GetFileName(srcPath)}");
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[m0n0t0ny] Failed to create raid backup: {ex.Message}");
+            }
+        }
+
+        private void RestoreRaidBackup()
+        {
+            try
+            {
+                var savesDir = Path.Combine(Application.persistentDataPath, "Saves");
+                var backups  = Directory.GetFiles(savesDir, "*.pre_raid");
+                if (backups.Length == 0) return;
+
+                var dstPath = backups[0];
+                var srcPath = dstPath.Substring(0, dstPath.Length - ".pre_raid".Length);
+                File.Copy(dstPath, srcPath, overwrite: true);
+                File.Delete(dstPath);
+
+                _raidBackupAvailable = false;
+                _playerDiedInRaid    = false;
+                Debug.Log($"[m0n0t0ny] Pre-raid save restored: {Path.GetFileName(srcPath)}");
+
+                Time.timeScale = 1f;
+                SceneManager.LoadScene(0);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[m0n0t0ny] Failed to restore raid save: {ex.Message}");
+            }
+        }
+
+        private void CheckRaidDead()
+        {
+            if (_condRaidDeadComp == null)
+            {
+                _condRaidDeadTimer -= Time.deltaTime;
+                if (_condRaidDeadTimer <= 0f) { _condRaidDeadTimer = 2f; TryInitCondRaidDead(); }
+            }
+            else if (_condRaidDeadProp != null)
+            {
+                bool dead = (bool)(_condRaidDeadProp.GetValue(_condRaidDeadComp) ?? (object)false);
+                if (dead)
+                {
+                    _playerDiedInRaid = true;
+                    RefreshRaidBackupUI();
+                }
+            }
+        }
+
+        private void TryInitCondRaidDead()
+        {
+            foreach (var ch in FindObjectsOfType<CharacterMainControl>())
+            {
+                if (!ch.IsMainCharacter) continue;
+                foreach (var comp in ch.GetComponents<Component>())
+                {
+                    if (comp.GetType().Name != "Condition_RaidDead") continue;
+                    var prop = comp.GetType().GetProperty("Dead", BindingFlags.Public | BindingFlags.Instance);
+                    if (prop?.PropertyType == typeof(bool))
+                    {
+                        _condRaidDeadComp = comp;
+                        _condRaidDeadProp = prop;
+                        return;
+                    }
+                }
+            }
+        }
+
         // ── ModConfig integration ─────────────────────────────────────────
 
         private void TryInitModConfig()
@@ -1910,7 +2283,8 @@ if (!lvActive || item == null) return;
             MCAddBool(PREF_SLEEP_ENABLED,    "Sleep preset buttons",           _sleepPresetsEnabled);
             MCAddBool(PREF_RECORDER_BADGE,   "Recorded items badge",           _showRecorderBadge);
             MCAddBool(PREF_FPS_COUNTER,      "FPS counter",                    _showFps);
-            MCAddBool(PREF_AUTO_UNLOAD,      "Auto-unload gun on kill",        _autoUnloadEnabled);
+            MCAddBool(PREF_AUTO_UNLOAD,        "Auto-unload gun on kill",          _autoUnloadEnabled);
+            MCAddBool(PREF_RAID_BACKUP_ENABLED,"Auto-backup on raid entry",         _raidBackupEnabled);
 
             // Dropdowns
             var modeOpts = new SortedDictionary<string, object>
@@ -1993,6 +2367,8 @@ if (!lvActive || item == null) return;
             }
             else if (key == PREF_AUTO_UNLOAD)
             { _autoUnloadEnabled = MCLoadBool(key, _autoUnloadEnabled); PlayerPrefs.SetInt(key, _autoUnloadEnabled ? 1 : 0); RefreshAutoUnloadToggle(); }
+            else if (key == PREF_RAID_BACKUP_ENABLED)
+            { _raidBackupEnabled = MCLoadBool(key, _raidBackupEnabled); PlayerPrefs.SetInt(key, _raidBackupEnabled ? 1 : 0); RefreshRaidBackupToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
