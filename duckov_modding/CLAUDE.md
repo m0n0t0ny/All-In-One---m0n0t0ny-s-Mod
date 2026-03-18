@@ -65,7 +65,7 @@ Execute ALL of the following steps automatically, without asking for confirmatio
 | Namespace | `AllInOneMod_m0n0t0ny` |
 | Display name | `All In One - m0n0t0ny's Mod` |
 | Settings key | F9 |
-| Current version | 2.2 |
+| Current version | 2.3 |
 
 ## Feature list (keep in sync with info.ini description)
 
@@ -79,11 +79,20 @@ Execute ALL of the following steps automatically, without asking for confirmatio
 - Skip melee on scroll: scroll wheel skips the melee slot; melee only equippable via V key (toggleable, ON by default)
 - Auto-unload on kill: when killing an enemy, their equipped gun's plugged items (ammo/magazine) are automatically moved to their stash (toggleable, ON by default)
 - Lootbox highlight: gold EPO outline on loot containers in the world; optional "only unsearched" filter (toggleable, ON by default)
+- Kill feed: shows kills in top-right HUD during raids (killer → victim, [HS] tag on headshots/crits, up to 5 entries with fade animation, toggleable, ON by default)
 - F9 opens settings menu with all toggles and configurable preset times
 
 ---
 
 ## Changelog
+
+### v2.3
+- Kill feed: kills shown in top-right HUD during raids (killer → victim, [HS] tag on headshots/crits, up to 5 entries with fade animation, toggleable in F9, ON by default)
+- Fix: lootbox highlight now only active during raids (IsRaidMap); no outlines appear in hideout
+- UI: F9 panel accent color changed from teal to gold (matches lootbox highlight outline)
+- UI: F9 panel sleep preset pickers (+/- buttons) now use dark gold style consistent with the rest of the panel
+- Fix: sleep preset buttons in the game UI (Rain / Storm I / etc.) now visually identical to the Sleep button (correct ProceduralImage background, hover and selection states); moon icon hidden
+- Fix: F9 settings panel now stays on top of the game's ESC/pause menu (canvas sortingOrder raised to 32767)
 
 ### v2.2
 - Lootbox highlight: gold EPO outline on all loot containers in the world (ON by default, toggleable in F9); optional "Only unsearched" sub-toggle hides outline on already-opened containers; outline cleared automatically on scene load

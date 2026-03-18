@@ -98,6 +98,7 @@ namespace AllInOneMod_m0n0t0ny
 
         // ── Settings panel UI refs ────────────────────────────────────────
         private GameObject? _settingsCanvas;
+        private Canvas?     _settingsCanvasComp;
         private Image? _toggleBtnImage;
         private RectTransform? _toggleBtnThumb;
         private Image[]? _modeBtnImages;
@@ -188,6 +189,27 @@ namespace AllInOneMod_m0n0t0ny
         private static FieldInfo? _invInspectedField;   // Inventory.hasBeenInspectedInLootBox
         private static bool       _lbCached;
 
+        // ── Kill Feed ─────────────────────────────────────────────────────
+        private const string PREF_KILL_FEED = "DisplayItemValue_KillFeed";
+        private bool _killFeedEnabled;
+        private Image? _killFeedToggleImage;
+        private RectTransform? _killFeedToggleThumb;
+        private GameObject? _killFeedCanvas;
+        private GameObject? _killFeedContainer;
+        private readonly List<KfEntry> _kfEntries = new List<KfEntry>();
+        private const int   KF_MAX     = 5;
+        private const float KF_DISPLAY = 5f;
+        private const float KF_FADE    = 0.5f;
+
+        private sealed class KfEntry
+        {
+            public readonly GameObject  Go;
+            public readonly CanvasGroup Group;
+            public float Timer;
+            public KfEntry(GameObject go, CanvasGroup group, float timer)
+            { Go = go; Group = group; Timer = timer; }
+        }
+
         TextMeshProUGUI ValueText
         {
             get
@@ -224,21 +246,61 @@ namespace AllInOneMod_m0n0t0ny
             _autoUnloadEnabled       = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,         1) == 1;
             _lootboxHLEnabled        = PlayerPrefs.GetInt(PREF_LOOTBOX_HL,          1) == 1;
             _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
+            _killFeedEnabled         = PlayerPrefs.GetInt(PREF_KILL_FEED,             1) == 1;
             CacheRecorderReflection();
             EnsureLootboxTypes();
             BuildSettingsPanel();
             TryInitModConfig();
         }
 
+        private CursorLockMode _prevLockMode;
+        private bool           _prevCursorVisible;
+        private bool           _menuOpen;
+        private static readonly Type? _inputControlType =
+            AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+                .FirstOrDefault(t => t.Name == "CharacterInputControl");
+        private readonly List<Behaviour> _disabledInputControls = new List<Behaviour>();
+
         private void SetMenuVisible(bool open)
         {
+            _menuOpen = open;
             _settingsCanvas!.SetActive(open);
-            Time.timeScale = open ? 0f : 1f;
+            if (_settingsCanvasComp != null) _settingsCanvasComp.enabled = open;
+
+            if (open)
+            {
+                _prevLockMode      = Cursor.lockState;
+                _prevCursorVisible = Cursor.visible;
+                Cursor.lockState   = CursorLockMode.None;
+                Cursor.visible     = true;
+
+                _disabledInputControls.Clear();
+                if (_inputControlType != null)
+                {
+                    foreach (UnityEngine.Object obj in FindObjectsOfType(_inputControlType))
+                    {
+                        if (obj is Behaviour b && b.enabled)
+                        {
+                            b.enabled = false;
+                            _disabledInputControls.Add(b);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Cursor.lockState = _prevLockMode;
+                Cursor.visible   = _prevCursorVisible;
+
+                foreach (var b in _disabledInputControls)
+                    if (b != null) b.enabled = true;
+                _disabledInputControls.Clear();
+            }
         }
 
         void OnDestroy()
         {
-            Time.timeScale = 1f;
             if (_mcDelegate != null && _mcAPI != null)
             {
                 try
@@ -254,10 +316,12 @@ namespace AllInOneMod_m0n0t0ny
             if (_valueText != null) Destroy(_valueText.gameObject);
             if (_settingsCanvas != null) Destroy(_settingsCanvas);
             if (_fpsCanvas != null) Destroy(_fpsCanvas);
+            if (_killFeedCanvas != null) Destroy(_killFeedCanvas);
             ClearLootboxOutlines();
             foreach (var kvp in _slotBadges)
                 if (kvp.Value != null) Destroy(kvp.Value);
             _slotBadges.Clear();
+            ClearKillFeedSubscriptions();
         }
 
         private void EnsureFpsCanvas()
@@ -297,6 +361,7 @@ namespace AllInOneMod_m0n0t0ny
             ItemHoveringUI.onSetupItem += OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta += OnSetupMeta;
             SceneManager.sceneLoaded   += OnSceneLoaded;
+            Health.OnDead              += OnKillFeedDeadDirect;
         }
 
         void OnDisable()
@@ -304,16 +369,31 @@ namespace AllInOneMod_m0n0t0ny
             ItemHoveringUI.onSetupItem -= OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta -= OnSetupMeta;
             SceneManager.sceneLoaded   -= OnSceneLoaded;
+            Health.OnDead              -= OnKillFeedDeadDirect;
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             ClearLootboxOutlines();
+            ClearKillFeedSubscriptions();
         }
 
         void Update()
         {
             if (!_mcChecked) TryInitModConfig();
+
+            // If the game externally hides our canvas (SetActive or Canvas.enabled), restore it
+            if (_menuOpen && _settingsCanvas != null)
+            {
+                if (!_settingsCanvas.activeSelf) _settingsCanvas.SetActive(true);
+                if (_settingsCanvasComp != null && !_settingsCanvasComp.enabled) _settingsCanvasComp.enabled = true;
+            }
+
+            if (_settingsCanvas != null && _settingsCanvas.activeSelf)
+            {
+                if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
+                if (!Cursor.visible) Cursor.visible = true;
+            }
 
             _scrollDetectedThisFrame = false;
             if (_skipMeleeOnScroll)
@@ -327,7 +407,7 @@ namespace AllInOneMod_m0n0t0ny
             }
 
             if (Input.GetKeyDown(MENU_KEY))
-                SetMenuVisible(!_settingsCanvas!.activeSelf);
+                SetMenuVisible(!_menuOpen);
 
             if (_sleepPresetsEnabled)
                 CheckSleepViewInjection();
@@ -382,8 +462,11 @@ namespace AllInOneMod_m0n0t0ny
             if (_autoUnloadEnabled)
                 TryAutoUnloadLoot(activeLootView);
 
-            if (_lootboxHLEnabled)
+            if (_lootboxHLEnabled && LevelManager.Instance != null && LevelManager.Instance.IsRaidMap)
                 UpdateLootboxHighlight();
+
+            if (_killFeedEnabled)
+                UpdateKillFeedEntries();
 
             if (_showFps)
             {
@@ -906,46 +989,70 @@ if (!lvActive || item == null) return;
 
         private static TextMeshProUGUI AddGridBtn(GameObject row, SleepView sv, string label, Func<float?> getMinutes, Button? template)
         {
-            // Build from scratch — steal only the sprite from the Sleep button for rounded corners
-            var go = new GameObject($"P_{label}");
-            go.transform.SetParent(row.transform, false);
+            // The Sleep button uses ProceduralImage (game custom component) for its background,
+            // not a standard Unity Image, so we must Instantiate to preserve that visual style.
+            // The moon icon is identified by its sprite name ("bedtime") and hidden.
+            GameObject go;
+            Button btn;
+            TextMeshProUGUI? tmp = null;
 
-            // Background Image — use the targetGraphic sprite for rounded corners,
-            // falling back to the procedural rounded-rect sprite already in the mod
-            var img = go.AddComponent<Image>();
-            var templateImg = (template?.targetGraphic as Image)
-                           ?? template?.GetComponentInChildren<Image>(true);
-            img.sprite = templateImg?.sprite ?? GetOrCreateRoundedRectSprite();
-            img.type   = templateImg?.sprite != null ? templateImg.type : Image.Type.Sliced;
-            img.color  = Color.white;
+            if (template != null)
+            {
+                go = UnityEngine.Object.Instantiate(template.gameObject);
+                go.name = $"P_{label}";
+                go.transform.SetParent(row.transform, false);
 
-            // Button with game-matching colors: #88e1f7 normal, #d2f7ff hover
-            var btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-            var cols = btn.colors;
-            cols.normalColor      = new Color(0x88 / 255f, 0xe1 / 255f, 0xf7 / 255f, 1f);
-            cols.highlightedColor = new Color(0xd2 / 255f, 0xf7 / 255f, 0xff / 255f, 1f);
-            cols.pressedColor     = new Color(0x55 / 255f, 0xb8 / 255f, 0xd4 / 255f, 1f);
-            cols.colorMultiplier  = 1f;
-            btn.colors = cols;
+                btn = go.GetComponent<Button>();
+                btn.onClick.RemoveAllListeners();
 
-            // Text label — copy font from Sleep button's text if available
-            var txtGo = new GameObject("T");
-            txtGo.transform.SetParent(go.transform, false);
-            var tmp = txtGo.AddComponent<TextMeshProUGUI>();
-            var tr = txtGo.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
+                // Hide moon icon (identified by its "bedtime" sprite name)
+                foreach (var img in go.GetComponentsInChildren<Image>(true))
+                {
+                    if (img.sprite != null && img.sprite.name.IndexOf("bedtime", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        img.gameObject.SetActive(false);
+                        break;
+                    }
+                }
 
-            var sleepTxt = template?.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (sleepTxt != null) { tmp.font = sleepTxt.font; tmp.fontStyle = sleepTxt.fontStyle; tmp.color = sleepTxt.color; }
-            else { tmp.color = Color.white; }
-            tmp.text               = label;
-            tmp.alignment          = TextAlignmentOptions.Center;
-            tmp.enableWordWrapping = false;
-            tmp.enableAutoSizing   = true;
-            tmp.fontSizeMin        = 6f;
-            tmp.fontSizeMax        = 20f;
+                // Set label; disable TextLocalizor so it doesn't override our text
+                tmp = go.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (tmp != null)
+                {
+                    var loc = tmp.GetComponent<MonoBehaviour>(); // TextLocalizor if present
+                    // Disable any MonoBehaviour on the TMP GO whose name contains "Localiz"
+                    foreach (var mb in tmp.gameObject.GetComponents<MonoBehaviour>())
+                        if (mb != null && mb.GetType().Name.IndexOf("Localiz", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                            mb.enabled = false;
+                    tmp.text               = label;
+                    tmp.enableWordWrapping = false;
+                    tmp.enableAutoSizing   = true;
+                    tmp.fontSizeMin        = 6f;
+                    tmp.fontSizeMax        = 20f;
+                }
+            }
+            else
+            {
+                go = new GameObject($"P_{label}");
+                go.transform.SetParent(row.transform, false);
+                var img2 = go.AddComponent<Image>();
+                img2.sprite = GetOrCreateRoundedRectSprite();
+                img2.type   = Image.Type.Sliced;
+                img2.color  = Color.white;
+                btn = go.AddComponent<Button>();
+                btn.targetGraphic = img2;
+                var txtGo2 = new GameObject("T");
+                txtGo2.transform.SetParent(go.transform, false);
+                tmp = txtGo2.AddComponent<TextMeshProUGUI>();
+                var tr2 = txtGo2.GetComponent<RectTransform>();
+                tr2.anchorMin = Vector2.zero; tr2.anchorMax = Vector2.one;
+                tr2.sizeDelta = Vector2.zero; tr2.anchoredPosition = Vector2.zero;
+                tmp.text = label; tmp.color = Color.white;
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.enableWordWrapping = false;
+                tmp.enableAutoSizing = true;
+                tmp.fontSizeMin = 6f; tmp.fontSizeMax = 20f;
+            }
 
             btn.onClick.AddListener(() =>
             {
@@ -957,7 +1064,7 @@ if (!lvActive || item == null) return;
                     s.value = m.Value;
                 }
             });
-            return tmp;
+            return tmp ?? go.GetComponentInChildren<TextMeshProUGUI>(true)!;
         }
 
         // ── Preset time calculations ──────────────────────────────────────
@@ -1323,8 +1430,9 @@ if (!lvActive || item == null) return;
             _settingsCanvas = new GameObject("AllInOneMod_m0n0t0ny_Canvas");
             DontDestroyOnLoad(_settingsCanvas);
             var canvas = _settingsCanvas.AddComponent<Canvas>();
+            _settingsCanvasComp = canvas;
             canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 9999;
+            canvas.sortingOrder = 32767;
             _settingsCanvas.AddComponent<CanvasScaler>();
             _settingsCanvas.AddComponent<GraphicRaycaster>();
 
@@ -1363,13 +1471,13 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.2", 10f, prefW: 44f);
-            verGo.GetComponent<TextMeshProUGUI>().color = new Color(0f, 0.78f, 0.52f, 1f);
+            var verGo = LText(header, "Ver", "v2.3", 10f, prefW: 44f);
+            verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
-            // Teal accent line
+            // Gold accent line
             var accent = LChild(panel, "Accent", 2f);
-            accent.GetComponent<Image>().color = new Color(0f, 0.78f, 0.52f, 1f);
+            accent.GetComponent<Image>().color = new Color(1f, 0.75f, 0f, 1f);
 
             // ── Cards box — equal 16px padding on all four sides ─────────
             var cardsBox = new GameObject("CardsBox");
@@ -1446,6 +1554,12 @@ if (!lvActive || item == null) return;
             auRow.GetComponentInChildren<Button>().onClick.AddListener(OnAutoUnloadToggleClicked);
             RefreshAutoUnloadToggle();
 
+            var (kfRow, kfImg, kfThumb) = LToggleRow(c1e, "Kill feed",
+                "Shows kills in the top-right corner during raids");
+            _killFeedToggleImage = kfImg;
+            _killFeedToggleThumb = kfThumb;
+            kfRow.GetComponentInChildren<Button>().onClick.AddListener(OnKillFeedToggleClicked);
+            RefreshKillFeedToggle();
 
             // ── COL 1: Item Transfer ──────────────────────────────────────
             var c1t = LCard(col1, "Item Transfer");
@@ -1898,7 +2012,7 @@ if (!lvActive || item == null) return;
         private static void RefreshIOSToggle(Image track, RectTransform thumb, bool on)
         {
             track.color = on
-                ? new Color(0f, 0.78f, 0.52f, 1f)
+                ? new Color(1f, 0.75f, 0f, 1f)
                 : new Color(0.16f, 0.16f, 0.22f, 1f);
             thumb.anchoredPosition = new Vector2(on ? 11f : -11f, 0f);
         }
@@ -1915,7 +2029,7 @@ if (!lvActive || item == null) return;
             {
                 bool active = modes[i] == _mode;
                 _modeBtnImages![i].color = active
-                    ? new Color(0.04f, 0.42f, 0.28f, 1f)
+                    ? new Color(0.38f, 0.26f, 0f, 1f)
                     : new Color(0.11f, 0.115f, 0.15f, 1f);
                 _modeBtnLabels![i].color = active
                     ? Color.white
@@ -1971,7 +2085,7 @@ if (!lvActive || item == null) return;
             {
                 bool active = mods[i] == _transferModifier;
                 _transferModBtnImages![i].color = active
-                    ? new Color(0.04f, 0.42f, 0.28f, 1f)
+                    ? new Color(0.38f, 0.26f, 0f, 1f)
                     : new Color(0.11f, 0.115f, 0.15f, 1f);
                 _transferModBtnLabels![i].color = active ? Color.white : new Color(0.40f, 0.40f, 0.50f, 1f);
                 _transferModBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
@@ -2153,6 +2267,7 @@ if (!lvActive || item == null) return;
             MCAddBool(PREF_AUTO_UNLOAD,            "Auto-unload gun on kill",            _autoUnloadEnabled);
             MCAddBool(PREF_LOOTBOX_HL,             "Lootbox highlight",                  _lootboxHLEnabled);
             MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED,  "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_KILL_FEED,              "Kill feed",                          _killFeedEnabled);
             // Dropdowns
             var modeOpts = new SortedDictionary<string, object>
             {
@@ -2238,6 +2353,8 @@ if (!lvActive || item == null) return;
             { _lootboxHLEnabled = MCLoadBool(key, _lootboxHLEnabled); PlayerPrefs.SetInt(key, _lootboxHLEnabled ? 1 : 0); RefreshLootboxHLToggle(); if (!_lootboxHLEnabled) ClearLootboxOutlines(); }
             else if (key == PREF_LOOTBOX_HL_UNSEARCHED)
             { _lootboxHLOnlyUnsearched = MCLoadBool(key, _lootboxHLOnlyUnsearched); PlayerPrefs.SetInt(key, _lootboxHLOnlyUnsearched ? 1 : 0); RefreshLootboxHLUnsearchedToggle(); }
+            else if (key == PREF_KILL_FEED)
+            { _killFeedEnabled = MCLoadBool(key, _killFeedEnabled); PlayerPrefs.SetInt(key, _killFeedEnabled ? 1 : 0); RefreshKillFeedToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
@@ -2385,11 +2502,11 @@ if (!lvActive || item == null) return;
             var r = go.AddComponent<RectTransform>();
             r.sizeDelta = new Vector2(24, 28);
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.16f, 0.22f, 0.38f, 1f);
+            img.color = new Color(0.38f, 0.26f, 0f, 1f);
             var btn = go.AddComponent<Button>();
             var c   = btn.colors;
-            c.highlightedColor = new Color(0.24f, 0.36f, 0.58f, 1f);
-            c.pressedColor     = new Color(0.08f, 0.12f, 0.22f, 1f);
+            c.highlightedColor = new Color(0.55f, 0.38f, 0f, 1f);
+            c.pressedColor     = new Color(0.22f, 0.15f, 0f, 1f);
             btn.colors = c;
             var t = new GameObject("T");
             t.transform.SetParent(go.transform, false);
@@ -2430,6 +2547,165 @@ if (!lvActive || item == null) return;
             tmp.color = new Color(0.5f, 0.5f, 0.6f, 1f);
             go.AddComponent<LayoutElement>().preferredWidth = 12;
             return go;
+        }
+
+        // ── Kill Feed ─────────────────────────────────────────────────────
+
+        // Subscribed to the static Health.OnDead event (same approach as the KillFeed mod).
+        // Fires for every death in the game — no scanning, no polling needed.
+        private void OnKillFeedDeadDirect(Health health, DamageInfo dmgInfo)
+        {
+            if (!_killFeedEnabled) return;
+            var victim = dmgInfo.toDamageReceiver?.health?.TryGetCharacter();
+            if (victim == null) return;
+            var killer = dmgInfo.fromCharacter;
+
+            string victimName = victim.characterPreset != null
+                ? victim.characterPreset.DisplayName : "?";
+            string killerName = "";
+            if (killer != null && killer != victim)
+                killerName = killer.IsMainCharacter
+                    ? "You"
+                    : (killer.characterPreset != null ? killer.characterPreset.DisplayName : "");
+
+            bool headshot = dmgInfo.crit > 0;
+            string prefix = headshot ? "<color=#FF6060>[HS]</color> " : "";
+            string entry  = killerName.Length > 0
+                ? $"{prefix}{killerName} → {victimName}"
+                : $"{prefix}→ {victimName}";
+            AddKillFeedEntry(entry);
+        }
+
+        // ── Shared UI helpers ─────────────────────────────────────────────
+
+        private string? GetCharacterDisplayName(CharacterMainControl ctrl)
+        {
+            if (ctrl == null) return null;
+            var preset = _characterPresetField?.GetValue(ctrl);
+            if (preset == null) return null;
+            return _displayNameProp?.GetValue(preset) as string;
+        }
+
+        private void EnsureKillFeedCanvas()
+        {
+            if (_killFeedCanvas != null) return;
+
+            _killFeedCanvas = new GameObject("KillFeed");
+            DontDestroyOnLoad(_killFeedCanvas);
+            var canvas = _killFeedCanvas.AddComponent<Canvas>();
+            canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 90;
+            _killFeedCanvas.AddComponent<CanvasScaler>();
+            _killFeedCanvas.AddComponent<GraphicRaycaster>();
+
+            _killFeedContainer = new GameObject("Container");
+            _killFeedContainer.transform.SetParent(_killFeedCanvas.transform, false);
+            var rt = _killFeedContainer.AddComponent<RectTransform>();
+            rt.anchorMin        = new Vector2(1f, 1f);
+            rt.anchorMax        = new Vector2(1f, 1f);
+            rt.pivot            = new Vector2(1f, 1f);
+            rt.anchoredPosition = new Vector2(-10f, -42f); // below FPS counter
+            rt.sizeDelta        = new Vector2(0f, 0f);
+            var vlg = _killFeedContainer.AddComponent<VerticalLayoutGroup>();
+            vlg.childAlignment         = TextAnchor.UpperRight;
+            vlg.childForceExpandWidth  = false;
+            vlg.childForceExpandHeight = false;
+            vlg.spacing = 4f;
+            var csf = _killFeedContainer.AddComponent<ContentSizeFitter>();
+            csf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+            csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
+        private void AddKillFeedEntry(string text)
+        {
+            EnsureKillFeedCanvas();
+
+            while (_kfEntries.Count >= KF_MAX)
+            {
+                var oldest = _kfEntries[_kfEntries.Count - 1];
+                if (oldest.Go != null) Destroy(oldest.Go);
+                _kfEntries.RemoveAt(_kfEntries.Count - 1);
+            }
+
+            var go = new GameObject("KFEntry");
+            go.transform.SetParent(_killFeedContainer!.transform, false);
+            go.transform.SetAsFirstSibling();
+
+            var img = go.AddComponent<Image>();
+            img.color  = new Color(0f, 0f, 0f, 0.55f);
+            img.sprite = GetOrCreateRoundedRectSprite();
+            img.type   = Image.Type.Sliced;
+
+            // HorizontalLayoutGroup + ContentSizeFitter shrink-wraps the pill to text width
+            var hlg = go.AddComponent<HorizontalLayoutGroup>();
+            hlg.padding               = new RectOffset(8, 8, 4, 4);
+            hlg.childAlignment        = TextAnchor.MiddleCenter;
+            hlg.childControlWidth     = true;
+            hlg.childControlHeight    = true;
+            hlg.childForceExpandWidth  = false;
+            hlg.childForceExpandHeight = false;
+            var entryCsf = go.AddComponent<ContentSizeFitter>();
+            entryCsf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            entryCsf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+
+            var cg = go.AddComponent<CanvasGroup>();
+            cg.alpha = 0f;
+
+            var txtGo = new GameObject("T");
+            txtGo.transform.SetParent(go.transform, false);
+            var tmp = txtGo.AddComponent<TextMeshProUGUI>();
+            var templateTmp = GameplayDataSettings.UIStyle.TemplateTextUGUI;
+            if (templateTmp != null) tmp.font = templateTmp.font;
+            tmp.text               = text;
+            tmp.fontSize           = 12f;
+            tmp.color              = Color.white;
+            tmp.alignment          = TextAlignmentOptions.MidlineRight;
+            tmp.enableWordWrapping = false;
+            tmp.overflowMode       = TextOverflowModes.Overflow;
+            tmp.richText           = true;
+            var shadow = txtGo.AddComponent<UnityEngine.UI.Shadow>();
+            shadow.effectColor    = new Color(0f, 0f, 0f, 0.9f);
+            shadow.effectDistance = new Vector2(1f, -1f);
+
+            _kfEntries.Insert(0, new KfEntry(go, cg, KF_DISPLAY + KF_FADE));
+        }
+
+        private void UpdateKillFeedEntries()
+        {
+            for (int i = _kfEntries.Count - 1; i >= 0; i--)
+            {
+                var e = _kfEntries[i];
+                if (e.Go == null) { _kfEntries.RemoveAt(i); continue; }
+                e.Timer -= Time.deltaTime;
+
+                float alpha;
+                if      (e.Timer > KF_DISPLAY) alpha = (KF_DISPLAY + KF_FADE - e.Timer) / KF_FADE;
+                else if (e.Timer > KF_FADE)    alpha = 1f;
+                else if (e.Timer > 0f)         alpha = e.Timer / KF_FADE;
+                else { Destroy(e.Go); _kfEntries.RemoveAt(i); continue; }
+
+                e.Group.alpha = alpha;
+            }
+        }
+
+        private void ClearKillFeedSubscriptions()
+        {
+            foreach (var e in _kfEntries)
+                if (e.Go != null) Destroy(e.Go);
+            _kfEntries.Clear();
+        }
+
+        private void OnKillFeedToggleClicked()
+        {
+            _killFeedEnabled = !_killFeedEnabled;
+            PlayerPrefs.SetInt(PREF_KILL_FEED, _killFeedEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshKillFeedToggle();
+        }
+
+        private void RefreshKillFeedToggle()
+        {
+            RefreshIOSToggle(_killFeedToggleImage!, _killFeedToggleThumb!, _killFeedEnabled);
         }
     }
 }
