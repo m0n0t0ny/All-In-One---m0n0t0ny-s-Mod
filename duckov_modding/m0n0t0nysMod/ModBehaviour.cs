@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using Duckov.Quests;
+using Duckov.Quests.UI;
 using Duckov.UI;
 using Duckov.Utilities;
 using Duckov.Weathers;
@@ -189,6 +191,17 @@ namespace AllInOneMod_m0n0t0ny
         private static FieldInfo? _invInspectedField;   // Inventory.hasBeenInspectedInLootBox
         private static bool       _lbCached;
 
+        // ── Quest Favorites ───────────────────────────────────────────────
+        private const string PREF_QUEST_FAV     = "DisplayItemValue_QuestFav";
+        private const string PREF_QUEST_FAV_IDS = "DisplayItemValue_QuestFavIds";
+        private bool _questFavEnabled;
+        private readonly HashSet<int> _favoriteQuestIds = new HashSet<int>();
+        private float _questFavReorderTimer;
+        private Image? _questFavToggleImage;
+        private RectTransform? _questFavToggleThumb;
+        private static readonly FieldInfo? _qvActiveEntriesField =
+            typeof(QuestView).GetField("activeEntries", BindingFlags.NonPublic | BindingFlags.Instance);
+
         // ── Kill Feed ─────────────────────────────────────────────────────
         private const string PREF_KILL_FEED = "DisplayItemValue_KillFeed";
         private bool _killFeedEnabled;
@@ -247,6 +260,9 @@ namespace AllInOneMod_m0n0t0ny
             _lootboxHLEnabled        = PlayerPrefs.GetInt(PREF_LOOTBOX_HL,          1) == 1;
             _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
             _killFeedEnabled         = PlayerPrefs.GetInt(PREF_KILL_FEED,             1) == 1;
+            _questFavEnabled         = PlayerPrefs.GetInt(PREF_QUEST_FAV,             1) == 1;
+            foreach (var s in PlayerPrefs.GetString(PREF_QUEST_FAV_IDS, "").Split(','))
+                if (int.TryParse(s.Trim(), out int qid) && qid != 0) _favoriteQuestIds.Add(qid);
             CacheRecorderReflection();
             EnsureLootboxTypes();
             BuildSettingsPanel();
@@ -408,6 +424,19 @@ namespace AllInOneMod_m0n0t0ny
 
             if (Input.GetKeyDown(MENU_KEY))
                 SetMenuVisible(!_menuOpen);
+
+            if (_questFavEnabled && Input.GetKeyDown(KeyCode.N))
+                TryToggleQuestFavorite();
+
+            if (_questFavEnabled)
+            {
+                _questFavReorderTimer -= Time.unscaledDeltaTime;
+                if (_questFavReorderTimer <= 0f)
+                {
+                    _questFavReorderTimer = 0.15f;
+                    TryReorderQuestView();
+                }
+            }
 
             if (_sleepPresetsEnabled)
                 CheckSleepViewInjection();
@@ -1649,6 +1678,16 @@ if (!lvActive || item == null) return;
             lbuRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLUnsearchedToggleClicked);
             RefreshLootboxHLUnsearchedToggle();
 
+            // ── COL 2: Quest Favorites ────────────────────────────────────
+            var c2qf = LCard(col2, "Quests");
+
+            var (qfRow, qfImg, qfThumb) = LToggleRow(c2qf, "Quest favorites (N key)",
+                "Press N on a selected quest to pin it to the top of the list");
+            _questFavToggleImage = qfImg;
+            _questFavToggleThumb = qfThumb;
+            qfRow.GetComponentInChildren<Button>().onClick.AddListener(OnQuestFavToggleClicked);
+            RefreshQuestFavToggle();
+
             // ── COL 3: Recorded Items ─────────────────────────────────────
             var c3fr = LCard(col3, "Recorded Items");
 
@@ -2706,6 +2745,89 @@ if (!lvActive || item == null) return;
         private void RefreshKillFeedToggle()
         {
             RefreshIOSToggle(_killFeedToggleImage!, _killFeedToggleThumb!, _killFeedEnabled);
+        }
+
+        // ── Quest Favorites ───────────────────────────────────────────────
+
+        private void TryToggleQuestFavorite()
+        {
+            var view = QuestView.Instance;
+            if (view == null) return;
+            var quest = view.SelectedQuest;
+            if (quest == null) return;
+            int id = quest.ID;
+            if (_favoriteQuestIds.Contains(id))
+                _favoriteQuestIds.Remove(id);
+            else
+                _favoriteQuestIds.Add(id);
+            PlayerPrefs.SetString(PREF_QUEST_FAV_IDS, string.Join(",", _favoriteQuestIds));
+            PlayerPrefs.Save();
+            _questFavReorderTimer = 0f; // trigger immediate reorder next Update tick
+        }
+
+        private void TryReorderQuestView()
+        {
+            var view = QuestView.Instance;
+            if (view == null || !view.gameObject.activeInHierarchy) return;
+            var entries = _qvActiveEntriesField?.GetValue(view) as List<QuestEntry>;
+            if (entries == null || entries.Count == 0) return;
+            int favIdx = 0;
+            foreach (var entry in entries)
+            {
+                if (entry?.Target == null) continue;
+                bool isFav = _favoriteQuestIds.Contains(entry.Target.ID);
+                // Manage ★ overlay
+                var starTr = entry.transform.Find("FavStar");
+                if (isFav && starTr == null)
+                {
+                    var starGo = new GameObject("FavStar");
+                    starGo.transform.SetParent(entry.transform, false);
+                    var starTmp = starGo.AddComponent<TextMeshProUGUI>();
+                    starTmp.text = "♥";
+                    var rt = starGo.GetComponent<RectTransform>();
+                    rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
+                    rt.pivot = new Vector2(0f, 0.5f);
+                    rt.anchoredPosition = new Vector2(6f, 0f);
+                    rt.sizeDelta = new Vector2(28f, 28f);
+                    starTmp.fontSize = 20f;
+                    starTmp.alignment = TextAlignmentOptions.Center;
+                    starTmp.color = new Color(0.973f, 0.333f, 0.400f); // #f85566
+                }
+                else if (!isFav && starTr != null)
+                {
+                    UnityEngine.Object.Destroy(starTr.gameObject);
+                }
+                // Pin favorites to top
+                if (isFav) entry.transform.SetSiblingIndex(favIdx++);
+            }
+        }
+
+        private void OnQuestFavToggleClicked()
+        {
+            _questFavEnabled = !_questFavEnabled;
+            PlayerPrefs.SetInt(PREF_QUEST_FAV, _questFavEnabled ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshQuestFavToggle();
+            if (!_questFavEnabled)
+            {
+                // Remove all star overlays
+                var view = QuestView.Instance;
+                if (view != null)
+                {
+                    var entries = _qvActiveEntriesField?.GetValue(view) as List<QuestEntry>;
+                    if (entries != null)
+                        foreach (var entry in entries)
+                        {
+                            var starTr = entry?.transform.Find("FavStar");
+                            if (starTr != null) UnityEngine.Object.Destroy(starTr.gameObject);
+                        }
+                }
+            }
+        }
+
+        private void RefreshQuestFavToggle()
+        {
+            RefreshIOSToggle(_questFavToggleImage!, _questFavToggleThumb!, _questFavEnabled);
         }
     }
 }
