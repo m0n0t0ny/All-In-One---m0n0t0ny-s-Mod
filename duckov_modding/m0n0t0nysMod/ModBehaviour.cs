@@ -203,10 +203,14 @@ namespace AllInOneMod_m0n0t0ny
             typeof(QuestView).GetField("activeEntries", BindingFlags.NonPublic | BindingFlags.Instance);
 
         // ── Kill Feed ─────────────────────────────────────────────────────
-        private const string PREF_KILL_FEED = "DisplayItemValue_KillFeed";
+        private const string PREF_KILL_FEED   = "DisplayItemValue_KillFeed";
+        private const string PREF_HIDE_CTRL  = "DisplayItemValue_HideCtrlHint";
         private bool _killFeedEnabled;
         private Image? _killFeedToggleImage;
         private RectTransform? _killFeedToggleThumb;
+        private bool _hideCtrlHint;
+        private Image? _hideCtrlToggleImage;
+        private RectTransform? _hideCtrlToggleThumb;
         private GameObject? _killFeedCanvas;
         private GameObject? _killFeedContainer;
         private readonly List<KfEntry> _kfEntries = new List<KfEntry>();
@@ -260,6 +264,7 @@ namespace AllInOneMod_m0n0t0ny
             _lootboxHLEnabled        = PlayerPrefs.GetInt(PREF_LOOTBOX_HL,          1) == 1;
             _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
             _killFeedEnabled         = PlayerPrefs.GetInt(PREF_KILL_FEED,             1) == 1;
+            _hideCtrlHint            = PlayerPrefs.GetInt(PREF_HIDE_CTRL,             1) == 1;
             _questFavEnabled         = PlayerPrefs.GetInt(PREF_QUEST_FAV,             1) == 1;
             foreach (var s in PlayerPrefs.GetString(PREF_QUEST_FAV_IDS, "").Split(','))
                 if (int.TryParse(s.Trim(), out int qid) && qid != 0) _favoriteQuestIds.Add(qid);
@@ -363,7 +368,7 @@ namespace AllInOneMod_m0n0t0ny
             rt.anchorMin        = new Vector2(1f, 1f);
             rt.anchorMax        = new Vector2(1f, 1f);
             rt.pivot            = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-10f, -10f);
+            rt.anchoredPosition = new Vector2(-42f, -10f);
             rt.sizeDelta        = new Vector2(100f, 30f);
 
             // Shadow for readability
@@ -392,11 +397,30 @@ namespace AllInOneMod_m0n0t0ny
         {
             ClearLootboxOutlines();
             ClearKillFeedSubscriptions();
+            _simpleIndicators = null;
+            _simpleIndicatorsFound = false;
         }
 
+        private Transform? _simpleIndicators;
+        private bool _simpleIndicatorsFound;
         void Update()
         {
             if (!_mcChecked) TryInitModConfig();
+            if (!_simpleIndicatorsFound && LevelManager.Instance != null)
+            {
+                foreach (var c in UnityEngine.Object.FindObjectsOfType<Canvas>())
+                {
+                    if (c.gameObject.name != "HUDCanvas") continue;
+                    var si = c.transform.Find("SimpleIndicators");
+                    if (si == null) continue;
+                    _simpleIndicators = si;
+                    _simpleIndicatorsFound = true;
+                    break;
+                }
+            }
+            // Keep enforcing: if hide is on and the game re-enabled it, hide it again
+            if (_hideCtrlHint && _simpleIndicators && _simpleIndicators.gameObject.activeSelf)
+                _simpleIndicators.gameObject.SetActive(false);
 
             // If the game externally hides our canvas (SetActive or Canvas.enabled), restore it
             if (_menuOpen && _settingsCanvas != null)
@@ -1500,7 +1524,7 @@ if (!lvActive || item == null) return;
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.3", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.5", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1707,6 +1731,13 @@ if (!lvActive || item == null) return;
             _fpsToggleThumb = fpsThumb;
             fpsRow.GetComponentInChildren<Button>().onClick.AddListener(OnFpsToggleClicked);
             RefreshFpsToggle();
+
+            var (hcRow, hcImg, hcThumb) = LToggleRow(c3fps, "Hide controls hint",
+                "Hides the 'Controls [O]' button in the HUD");
+            _hideCtrlToggleImage = hcImg;
+            _hideCtrlToggleThumb = hcThumb;
+            hcRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideCtrlToggleClicked);
+            RefreshHideCtrlToggle();
 
             // ── COL 3: Sleep Presets ──────────────────────────────────────
             var c3sp = LCard(col3, "Sleep Presets");
@@ -2643,7 +2674,7 @@ if (!lvActive || item == null) return;
             rt.anchorMin        = new Vector2(1f, 1f);
             rt.anchorMax        = new Vector2(1f, 1f);
             rt.pivot            = new Vector2(1f, 1f);
-            rt.anchoredPosition = new Vector2(-10f, -42f); // below FPS counter
+            rt.anchoredPosition = new Vector2(-32f, _hideCtrlHint ? -76f : -152f);
             rt.sizeDelta        = new Vector2(0f, 0f);
             var vlg = _killFeedContainer.AddComponent<VerticalLayoutGroup>();
             vlg.childAlignment         = TextAnchor.UpperRight;
@@ -2747,6 +2778,35 @@ if (!lvActive || item == null) return;
             RefreshIOSToggle(_killFeedToggleImage!, _killFeedToggleThumb!, _killFeedEnabled);
         }
 
+        // ── Hide Controls Hint ────────────────────────────────────────────
+
+        private void OnHideCtrlToggleClicked()
+        {
+            _hideCtrlHint = !_hideCtrlHint;
+            PlayerPrefs.SetInt(PREF_HIDE_CTRL, _hideCtrlHint ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshHideCtrlToggle();
+            ApplyCtrlHintSetting();
+        }
+
+        private void RefreshHideCtrlToggle()
+        {
+            if (_hideCtrlToggleImage != null)
+                RefreshIOSToggle(_hideCtrlToggleImage, _hideCtrlToggleThumb!, _hideCtrlHint);
+        }
+
+        private void ApplyCtrlHintSetting()
+        {
+            if (_simpleIndicators != null)
+                _simpleIndicators.gameObject.SetActive(!_hideCtrlHint);
+            if (_killFeedContainer != null)
+            {
+                var rt = _killFeedContainer.GetComponent<RectTransform>();
+                if (rt != null)
+                    rt.anchoredPosition = new Vector2(-32f, _hideCtrlHint ? -76f : -152f);
+            }
+        }
+
         // ── Quest Favorites ───────────────────────────────────────────────
 
         private void TryToggleQuestFavorite()
@@ -2786,9 +2846,9 @@ if (!lvActive || item == null) return;
                     starTmp.text = "♥";
                     var rt = starGo.GetComponent<RectTransform>();
                     rt.anchorMin = rt.anchorMax = new Vector2(0f, 0.5f);
-                    rt.pivot = new Vector2(0f, 0.5f);
-                    rt.anchoredPosition = new Vector2(6f, 0f);
-                    rt.sizeDelta = new Vector2(28f, 28f);
+                    rt.pivot = new Vector2(0.5f, 0.5f);
+                    rt.anchoredPosition = new Vector2(35f, 0f);
+                    rt.sizeDelta = new Vector2(24f, 24f);
                     starTmp.fontSize = 20f;
                     starTmp.alignment = TextAlignmentOptions.Center;
                     starTmp.color = new Color(0.973f, 0.333f, 0.400f); // #f85566
