@@ -1,6 +1,6 @@
 # All In One - m0n0t0ny's Mod
 
-All-in-one quality of life mod for **Escape from Duckov**. 14 independent features, all toggleable from the **F9** settings menu.
+All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all toggleable from the **F9** settings menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -60,7 +60,7 @@ Scroll wheel skips the melee slot when cycling weapons. Melee can still be equip
 ### 🌙 Survival
 
 #### Sleep presets
-Wake-up preset buttons on the sleep screen: 4 custom configurable times, plus rain, Storm I, Storm II, and post-storm.
+Wake-up preset buttons on the sleep screen: 4 custom configurable times, plus rain, Storm I, Storm II, and Storm end.
 
 ![Sleep presets](assets/sleep-presets.png)
 
@@ -78,6 +78,11 @@ Displays current FPS in the top-right corner (OFF by default).
 Hides the native Controls [O] button and its submenu to reduce HUD clutter.
 
 ![Hide controls hint](assets/hide-controls-hint.png)
+
+#### Hide HUD on ADS
+Hides the entire HUD while holding right-click for a cleaner, more immersive aiming experience. Health bars and crosshair always remain visible. A sub-toggle lets you keep the ammo counter visible if preferred. OFF by default.
+
+![Hide HUD on ADS](assets/hide-hud-on-ads.png)
 
 #### Camera view persistence
 Remembers your camera preference (top-down or default) between sessions, and restores it automatically on load.

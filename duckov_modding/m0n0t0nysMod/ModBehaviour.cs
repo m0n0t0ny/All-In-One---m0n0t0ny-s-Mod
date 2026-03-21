@@ -211,12 +211,24 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_KILL_FEED = "DisplayItemValue_KillFeed";
         private const string PREF_HIDE_CTRL = "DisplayItemValue_HideCtrlHint";
         private const string PREF_CAMERA_VIEW = "DisplayItemValue_CameraView";
+        private const string PREF_HIDE_HUD_ADS = "DisplayItemValue_HideHudOnAds";
+        private const string PREF_HIDE_AMMO_ADS = "DisplayItemValue_HideAmmoOnAds";
         private bool _killFeedEnabled;
         private Image? _killFeedToggleImage;
         private RectTransform? _killFeedToggleThumb;
         private bool _hideCtrlHint;
         private Image? _hideCtrlToggleImage;
         private RectTransform? _hideCtrlToggleThumb;
+        private bool _hideHudOnAds;
+        private bool _hideAmmoOnAds;
+        private bool _adsHiding;
+        private readonly List<CanvasGroup> _adsHideGroups = new List<CanvasGroup>();
+        private readonly List<(CanvasGroup cg, float alpha, bool rays)> _adsSnapshot = new List<(CanvasGroup, float, bool)>();
+        private Transform? _aimMarkerTransform;
+        private Image? _hideHudAdsToggleImage;
+        private RectTransform? _hideHudAdsToggleThumb;
+        private Image? _hideAmmoAdsToggleImage;
+        private RectTransform? _hideAmmoAdsToggleThumb;
         private bool _cameraViewPersist;
         private Image? _cameraViewToggleImage;
         private RectTransform? _cameraViewToggleThumb;
@@ -281,6 +293,8 @@ namespace AllInOneMod_m0n0t0ny
             _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
             _killFeedEnabled = PlayerPrefs.GetInt(PREF_KILL_FEED, 1) == 1;
             _hideCtrlHint = PlayerPrefs.GetInt(PREF_HIDE_CTRL, 1) == 1;
+            _hideHudOnAds = PlayerPrefs.GetInt(PREF_HIDE_HUD_ADS, 0) == 1;
+            _hideAmmoOnAds = PlayerPrefs.GetInt(PREF_HIDE_AMMO_ADS, 1) == 1;
             _cameraViewPersist = PlayerPrefs.GetInt(PREF_CAMERA_VIEW, 1) == 1;
             _savedTopDown = PlayerPrefs.GetInt("CameraViewSavedTopDown", 0) == 1;
             _questFavEnabled = PlayerPrefs.GetInt(PREF_QUEST_FAV, 1) == 1;
@@ -419,7 +433,10 @@ namespace AllInOneMod_m0n0t0ny
             ClearLootboxOutlines();
             ClearKillFeedSubscriptions();
             _simpleIndicators = null;
+            _adsHideGroups.Clear();
+            _aimMarkerTransform = null;
             _simpleIndicatorsFound = false;
+            _adsHiding = false;
             _viewRestorePending = true;
         }
 
@@ -443,13 +460,82 @@ namespace AllInOneMod_m0n0t0ny
                     var si = c.transform.Find("SimpleIndicators");
                     if (si == null) continue;
                     _simpleIndicators = si;
+                    // Find aim-related top-level children to KEEP visible
+                    var keepTopLevel = new System.Collections.Generic.HashSet<Transform>();
+                    foreach (var t in c.GetComponentsInChildren<Transform>(true))
+                    {
+                        if (t == c.transform) continue;
+                        var n = t.name;
+                        if (n.IndexOf("CrossHair", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            n.IndexOf("AimMarker", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            n.IndexOf("Reticle",   StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            var cur = t;
+                            while (cur.parent != null && cur.parent != c.transform)
+                                cur = cur.parent;
+                            if (cur.parent == c.transform) keepTopLevel.Add(cur);
+                        }
+                    }
+                    // Also keep health bars visible during ADS
+                    for (int i = 0; i < c.transform.childCount; i++)
+                    {
+                        var child = c.transform.GetChild(i);
+                        if (child.name.IndexOf("Health", StringComparison.OrdinalIgnoreCase) >= 0)
+                            keepTopLevel.Add(child);
+                    }
+                    // Build a CanvasGroup per child-to-hide (avoids SetActive spikes)
+                    _adsHideGroups.Clear();
+                    for (int i = 0; i < c.transform.childCount; i++)
+                    {
+                        var child = c.transform.GetChild(i);
+                        if (keepTopLevel.Contains(child)) continue;
+                        var cg = child.gameObject.GetComponent<CanvasGroup>()
+                              ?? child.gameObject.AddComponent<CanvasGroup>();
+                        _adsHideGroups.Add(cg);
+                    }
+                    // Store AimMarker reference for optional ammo hiding during ADS
+                    _aimMarkerTransform = c.transform.Find("AimMarker");
                     _simpleIndicatorsFound = true;
                     break;
                 }
             }
             // Keep enforcing: if hide is on and the game re-enabled it, hide it again
-            if (_hideCtrlHint && _simpleIndicators && _simpleIndicators.gameObject.activeSelf)
+            if (_hideCtrlHint && _simpleIndicators != null && _simpleIndicators.gameObject.activeSelf)
                 _simpleIndicators.gameObject.SetActive(false);
+
+            // Hide HUD on ADS (right mouse button) - CanvasGroup.alpha avoids SetActive spikes
+            if (_hideHudOnAds && _simpleIndicatorsFound && _adsHideGroups.Count > 0 && !_menuOpen)
+            {
+                bool ads = Input.GetMouseButton(1);
+                if (ads && !_adsHiding)
+                {
+                    _adsHiding = true;
+                    _adsSnapshot.Clear();
+                    foreach (var cg in _adsHideGroups)
+                    {
+                        // If "Hide ammo on ADS" is OFF, keep bullet/weapon HUD visible
+                        if (!_hideAmmoOnAds && cg.gameObject != null &&
+                            cg.gameObject.name.IndexOf("Bullet", StringComparison.OrdinalIgnoreCase) >= 0)
+                            continue;
+                        _adsSnapshot.Add((cg, cg.alpha, cg.blocksRaycasts));
+                        cg.alpha = 0f;
+                        cg.blocksRaycasts = false;
+                    }
+                }
+                // re-enforce handled in LateUpdate
+                else if (!ads && _adsHiding)
+                {
+                    _adsHiding = false;
+                    foreach (var s in _adsSnapshot) { if (s.cg == null) continue; s.cg.alpha = s.alpha; s.cg.blocksRaycasts = s.rays; }
+                    _adsSnapshot.Clear();
+                }
+            }
+            else if (_adsHiding)
+            {
+                _adsHiding = false;
+                foreach (var s in _adsSnapshot) { if (s.cg == null) continue; s.cg.alpha = s.alpha; s.cg.blocksRaycasts = s.rays; }
+                _adsSnapshot.Clear();
+            }
 
             // Camera view: restore saved preference on scene load, then track changes
             if (_cameraViewPersist && LevelManager.Instance != null)
@@ -585,6 +671,10 @@ namespace AllInOneMod_m0n0t0ny
 
         void LateUpdate()
         {
+            // Re-enforce ADS hide after all game Update() calls have run
+            if (_adsHiding)
+                foreach (var s in _adsSnapshot) { if (s.cg == null) continue; s.cg.alpha = 0f; s.cg.blocksRaycasts = false; }
+
             // Snapshot the hovered item at the END of every frame so that
             // TryShiftClickTransfer() in the NEXT frame's Update() sees a
             // stable value even if EventSystem clears the hover mid-frame.
@@ -919,6 +1009,7 @@ namespace AllInOneMod_m0n0t0ny
         private void CheckAutoCloseContainer(LootView? lv)
         {
             if (lv == null) return;
+            if (LevelManager.Instance == null || !LevelManager.Instance.IsRaidMap) return;
 
             if (_autoCloseOnWASD &&
                 (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) ||
@@ -1072,7 +1163,7 @@ namespace AllInOneMod_m0n0t0ny
             AddGridBtn(row2, sv, "Rain", () => MinutesUntilRain(), sleepBtn);
             AddGridBtn(row2, sv, "Storm I", () => MinutesUntilStorm(1), sleepBtn);
             AddGridBtn(row2, sv, "Storm II", () => MinutesUntilStorm(2), sleepBtn);
-            AddGridBtn(row2, sv, "Post-Storm", () => MinutesUntilStormEnd(), sleepBtn);
+            AddGridBtn(row2, sv, "Storm End", () => MinutesUntilStormEnd(), sleepBtn);
         }
 
         private static GameObject MakePresetRow(GameObject parent)
@@ -1588,6 +1679,10 @@ namespace AllInOneMod_m0n0t0ny
             ["Show FPS counter"] = new[] { "Afficher compteur FPS", "FPS-Anzeige einblenden", "显示帧率计数器", "顯示幀率計數器", "FPSカウンターを表示", "FPS 카운터 표시", "Mostrar contador FPS", "Показывать счётчик FPS", "Mostrar contador FPS" },
             ["Hide controls hint"] = new[] { "Masquer l'aide de contrôle", "Steuerungshinweis ausblenden", "隐藏操作提示", "隱藏操作提示", "操作ヒントを非表示", "조작 힌트 숨기기", "Ocultar dica de controles", "Скрыть подсказку управления", "Ocultar ayuda de controles" },
             ["Remember camera view"] = new[] { "Mémoriser la vue caméra", "Kameraansicht merken", "记住相机视角", "記住相機視角", "カメラビューを記憶", "카메라 뷰 기억", "Lembrar visão de câmera", "Запомнить вид камеры", "Recordar vista de cámara" },
+            ["Hide HUD on ADS"] = new[] { "Masquer HUD en visée", "HUD beim Zielen ausblenden", "瞄准时隐藏HUD", "瞄準時隱藏HUD", "ADS中HUDを非表示", "ADS 시 HUD 숨기기", "Ocultar HUD ao mirar", "Скрывать HUD при прицеливании", "Ocultar HUD al apuntar" },
+            ["Hides the entire HUD while holding right-click (OFF by default)"] = new[] { "Cache tout le HUD lors du clic droit", "Blendet HUD bei Rechtsklick aus", "右键时隐藏全部HUD", "右鍵時隱藏全部HUD", "右クリック中HUD全体を非表示", "우클릭 중 전체 HUD 숨김", "Oculta HUD ao segurar clique direito", "Скрывает весь HUD при ПКМ", "Oculta HUD al mantener clic derecho" },
+            ["Hide ammo on ADS"] = new[] { "Masquer munitions en visée", "Munition beim Zielen ausblenden", "瞄准时隐藏弹药", "瞄準時隱藏彈藥", "ADS中弾薬を非表示", "ADS 시 탄약 숨기기", "Ocultar munição ao mirar", "Скрывать боеприпасы при прицеливании", "Ocultar munición al apuntar" },
+            ["Also hides bullet type and ammo count during ADS"] = new[] { "Cache aussi le type et la quantité de munitions", "Versteckt auch Munitionstyp und -anzahl beim Zielen", "同时隐藏弹药类型和数量", "同時隱藏彈藥類型和數量", "弾薬の種類と数もADS中に非表示", "ADS 중 탄약 종류 및 수량도 숨김", "Também oculta tipo e quantidade de munição", "Также скрывает тип и количество боеприпасов", "También oculta tipo y cantidad de munición" },
             ["Wake-up preset buttons"] = new[] { "Boutons de réveil", "Aufwach-Schnelltasten", "醒来预设按钮", "醒來預設按鈕", "起床プリセット", "기상 프리셋 버튼", "Botões de acordar", "Кнопки пробуждения", "Botones de despertar" },
             // Sub-labels
             ["Display mode"] = new[] { "Mode d'affichage", "Anzeigemodus", "显示模式", "顯示模式", "表示モード", "표시 모드", "Modo de exibição", "Режим отображения", "Modo de visualización" },
@@ -1636,7 +1731,7 @@ namespace AllInOneMod_m0n0t0ny
             ["Stack only"] = new[] { "Pile seulement", "Nur Stapel", "仅堆叠", "僅堆疊", "スタックのみ", "스택만", "Somente pilha", "Только стопка", "Solo pila" },
             ["Item transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de item", "Перенос предметов", "Transferencia de objetos" },
             ["Disabled"] = new[] { "Désactivé", "Deaktiviert", "禁用", "禁用", "無効", "비활성화", "Desativado", "Отключено", "Desactivado" },
-            ["Enabled"]  = new[] { "Activé", "Aktiviert", "启用", "啟用", "有効", "활성화", "Ativado", "Включено", "Activado" },
+            ["Enabled"] = new[] { "Activé", "Aktiviert", "启用", "啟用", "有効", "활성화", "Ativado", "Включено", "Activado" },
             ["Shift + Left Click"] = new[] { "Shift+Clic gauche", "Shift+Linksklick", "Shift+左键单击", "Shift+左鍵單擊", "Shift+左クリック", "Shift+좌클릭", "Shift+Clique esquerdo", "Shift+Левый клик", "Shift+Clic izquierdo" },
             ["Alt + Left Click"] = new[] { "Alt+Clic gauche", "Alt+Linksklick", "Alt+左键单击", "Alt+左鍵單擊", "Alt+左クリック", "Alt+좌클릭", "Alt+Clique esquerdo", "Alt+Левый клик", "Alt+Clic izquierdo" },
             ["Preset 1 - hour"] = new[] { "Prérégl. 1 - heure", "Voreinst. 1 - Stunde", "预设 1 - 小时", "預設 1 - 小時", "プリセット 1 - 時間", "프리셋 1 - 시간", "Predefinição 1 - hora", "Пресет 1 - час", "Preajuste 1 - hora" },
@@ -1717,7 +1812,7 @@ namespace AllInOneMod_m0n0t0ny
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.8", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.9", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1938,6 +2033,20 @@ namespace AllInOneMod_m0n0t0ny
             _cameraViewToggleThumb = cvThumb;
             cvRow.GetComponentInChildren<Button>().onClick.AddListener(OnCameraViewToggleClicked);
             RefreshCameraViewToggle();
+
+            var (adsRow, adsImg, adsThumb) = LToggleRow(c3fps, L("Hide HUD on ADS"),
+                L("Hides the entire HUD while holding right-click (OFF by default)"));
+            _hideHudAdsToggleImage = adsImg;
+            _hideHudAdsToggleThumb = adsThumb;
+            adsRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideHudAdsToggleClicked);
+            RefreshHideHudAdsToggle();
+
+            var (ammoAdsRow, ammoAdsImg, ammoAdsThumb) = LToggleRow(c3fps, L("Hide ammo on ADS"),
+                L("Also hides bullet type and ammo count during ADS"));
+            _hideAmmoAdsToggleImage = ammoAdsImg;
+            _hideAmmoAdsToggleThumb = ammoAdsThumb;
+            ammoAdsRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideAmmoAdsToggleClicked);
+            RefreshHideAmmoAdsToggle();
 
             // ── COL 3: Sleep Presets ──────────────────────────────────────
             var c3sp = LCard(col3, L("Sleep Presets"));
@@ -2291,10 +2400,11 @@ namespace AllInOneMod_m0n0t0ny
 
         private void SaveSellComboPrefs()
         {
-            int v = !_showValue ? 0 : _mode switch {
+            int v = !_showValue ? 0 : _mode switch
+            {
                 DisplayMode.SingleOnly => 1,
-                DisplayMode.StackOnly  => 2,
-                _                      => 3,
+                DisplayMode.StackOnly => 2,
+                _ => 3,
             };
             PlayerPrefs.SetInt(PREF_SELL_COMBO, v);
         }
@@ -2585,6 +2695,8 @@ namespace AllInOneMod_m0n0t0ny
             MCAddBool(PREF_SLEEP_ENABLED, L("Wake-up preset buttons"), _sleepPresetsEnabled);
             MCAddBool(PREF_CAMERA_VIEW, L("Remember camera view"), _cameraViewPersist);
             MCAddBool(PREF_HIDE_CTRL, L("Hide controls hint"), _hideCtrlHint);
+            MCAddBool(PREF_HIDE_HUD_ADS, L("Hide HUD on ADS"), _hideHudOnAds);
+            MCAddBool(PREF_HIDE_AMMO_ADS, L("Hide ammo on ADS"), _hideAmmoOnAds);
             MCAddBool(PREF_QUEST_FAV, L("Quest favorites (N key)"), _questFavEnabled);
             MCAddBool(PREF_KILL_FEED, L("Kill feed"), _killFeedEnabled);
             MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, L("Only unsearched"), _lootboxHLOnlyUnsearched);
@@ -2611,10 +2723,11 @@ namespace AllInOneMod_m0n0t0ny
             MCAddBool(PREF_ENEMY_NAMES, L("Show enemy names"), _showEnemyNames);
 
             // Last registered = first displayed
-            int sellComboDefault = !_showValue ? 0 : _mode switch {
+            int sellComboDefault = !_showValue ? 0 : _mode switch
+            {
                 DisplayMode.SingleOnly => 1,
-                DisplayMode.StackOnly  => 2,
-                _                      => 3,
+                DisplayMode.StackOnly => 2,
+                _ => 3,
             };
             var sellComboOpts = new SortedDictionary<string, object>
             {
@@ -2669,10 +2782,11 @@ namespace AllInOneMod_m0n0t0ny
 
             if (key == PREF_SELL_COMBO)
             {
-                int sellComboDefault = !_showValue ? 0 : _mode switch {
+                int sellComboDefault = !_showValue ? 0 : _mode switch
+                {
                     DisplayMode.SingleOnly => 1,
-                    DisplayMode.StackOnly  => 2,
-                    _                      => 3,
+                    DisplayMode.StackOnly => 2,
+                    _ => 3,
                 };
                 int v = MCLoadInt(key, sellComboDefault);
                 _showValue = v != 0;
@@ -2739,6 +2853,10 @@ namespace AllInOneMod_m0n0t0ny
             { _hideCtrlHint = MCLoadBool(key, _hideCtrlHint); PlayerPrefs.SetInt(key, _hideCtrlHint ? 1 : 0); RefreshHideCtrlToggle(); ApplyCtrlHintSetting(); }
             else if (key == PREF_CAMERA_VIEW)
             { _cameraViewPersist = MCLoadBool(key, _cameraViewPersist); PlayerPrefs.SetInt(key, _cameraViewPersist ? 1 : 0); RefreshCameraViewToggle(); }
+            else if (key == PREF_HIDE_HUD_ADS)
+            { _hideHudOnAds = MCLoadBool(key, _hideHudOnAds); PlayerPrefs.SetInt(key, _hideHudOnAds ? 1 : 0); RefreshHideHudAdsToggle(); }
+            else if (key == PREF_HIDE_AMMO_ADS)
+            { _hideAmmoOnAds = MCLoadBool(key, _hideAmmoOnAds); PlayerPrefs.SetInt(key, _hideAmmoOnAds ? 1 : 0); RefreshHideAmmoAdsToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
@@ -2845,6 +2963,8 @@ namespace AllInOneMod_m0n0t0ny
             MCSetInt(PREF_QUEST_FAV, _questFavEnabled ? 1 : 0);
             MCSetInt(PREF_HIDE_CTRL, _hideCtrlHint ? 1 : 0);
             MCSetInt(PREF_CAMERA_VIEW, _cameraViewPersist ? 1 : 0);
+            MCSetInt(PREF_HIDE_HUD_ADS, _hideHudOnAds ? 1 : 0);
+            MCSetInt(PREF_HIDE_AMMO_ADS, _hideAmmoOnAds ? 1 : 0);
             MCSetInt(PREF_SLEEP_ENABLED, _sleepPresetsEnabled ? 1 : 0);
             MCSetInt(PREF_RECORDER_BADGE, _showRecorderBadge ? 1 : 0);
             MCSetInt(PREF_FPS_COUNTER, _showFps ? 1 : 0);
@@ -2872,6 +2992,8 @@ namespace AllInOneMod_m0n0t0ny
             ApplyModConfigValue(PREF_QUEST_FAV);
             ApplyModConfigValue(PREF_HIDE_CTRL);
             ApplyModConfigValue(PREF_CAMERA_VIEW);
+            ApplyModConfigValue(PREF_HIDE_HUD_ADS);
+            ApplyModConfigValue(PREF_HIDE_AMMO_ADS);
             ApplyModConfigValue(PREF_SLEEP_ENABLED);
             ApplyModConfigValue(PREF_RECORDER_BADGE);
             ApplyModConfigValue(PREF_FPS_COUNTER);
@@ -3209,6 +3331,36 @@ namespace AllInOneMod_m0n0t0ny
         {
             if (_cameraViewToggleImage != null)
                 RefreshIOSToggle(_cameraViewToggleImage, _cameraViewToggleThumb!, _cameraViewPersist);
+        }
+
+        // ── Hide HUD on ADS ───────────────────────────────────────────────
+
+        private void OnHideHudAdsToggleClicked()
+        {
+            _hideHudOnAds = !_hideHudOnAds;
+            PlayerPrefs.SetInt(PREF_HIDE_HUD_ADS, _hideHudOnAds ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshHideHudAdsToggle();
+        }
+
+        private void RefreshHideHudAdsToggle()
+        {
+            if (_hideHudAdsToggleImage != null)
+                RefreshIOSToggle(_hideHudAdsToggleImage, _hideHudAdsToggleThumb!, _hideHudOnAds);
+        }
+
+        private void OnHideAmmoAdsToggleClicked()
+        {
+            _hideAmmoOnAds = !_hideAmmoOnAds;
+            PlayerPrefs.SetInt(PREF_HIDE_AMMO_ADS, _hideAmmoOnAds ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshHideAmmoAdsToggle();
+        }
+
+        private void RefreshHideAmmoAdsToggle()
+        {
+            if (_hideAmmoAdsToggleImage != null)
+                RefreshIOSToggle(_hideAmmoAdsToggleImage, _hideAmmoAdsToggleThumb!, _hideAmmoOnAds);
         }
 
         // ── Quest Favorites ───────────────────────────────────────────────
