@@ -419,6 +419,9 @@ namespace AllInOneMod_m0n0t0ny
         void Update()
         {
             if (!_mcChecked) TryInitModConfig();
+            var curLang = GetGameLanguage();
+            if (_lastLang != SystemLanguage.Unknown && curLang != _lastLang)
+                RebuildSettingsPanel();
             if (!_simpleIndicatorsFound && LevelManager.Instance != null)
             {
                 foreach (var c in UnityEngine.Object.FindObjectsOfType<Canvas>())
@@ -1507,10 +1510,126 @@ namespace AllInOneMod_m0n0t0ny
             return _pillSprite;
         }
 
+        // ── Localization ──────────────────────────────────────────────────
+
+        private static PropertyInfo? _locLangProp;
+        private static bool _locInit;
+        private SystemLanguage _lastLang = SystemLanguage.Unknown;
+
+        private static SystemLanguage GetGameLanguage()
+        {
+            if (!_locInit)
+            {
+                _locInit = true;
+                try
+                {
+                    var t = AppDomain.CurrentDomain.GetAssemblies()
+                        .SelectMany(a => { try { return a.GetTypes(); } catch { return Type.EmptyTypes; } })
+                        .FirstOrDefault(t => t.FullName == "SodaCraft.Localizations.LocalizationManager");
+                    _locLangProp = t?.GetProperty("CurrentLanguage", BindingFlags.Public | BindingFlags.Static);
+                }
+                catch { }
+            }
+            try { if (_locLangProp != null) return (SystemLanguage)_locLangProp.GetValue(null)!; }
+            catch { }
+            return SystemLanguage.English;
+        }
+
+        // Translation table: key = English text, value = [fr, de, zh-CN, zh-TW, ja, ko, pt, ru, es]
+        private static readonly SystemLanguage[] _langOrder =
+        {
+            SystemLanguage.French, SystemLanguage.German,
+            SystemLanguage.ChineseSimplified, SystemLanguage.ChineseTraditional,
+            SystemLanguage.Japanese, SystemLanguage.Korean,
+            SystemLanguage.Portuguese, SystemLanguage.Russian, SystemLanguage.Spanish
+        };
+
+        private static readonly Dictionary<string, string[]> _t = new Dictionary<string, string[]>
+        {
+            // Card titles
+            ["Item Value"] = new[] { "Valeur d'objet", "Gegenstandswert", "物品价值", "物品價值", "アイテム価格", "아이템 가치", "Valor do Item", "Стоимость предмета", "Valor del objeto" },
+            ["Enemies"] = new[] { "Ennemis", "Feinde", "敌人", "敵人", "敵", "적", "Inimigos", "Враги", "Enemigos" },
+            ["Item Transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de Item", "Перенос предметов", "Transferencia de objetos" },
+            ["Auto-Close Container"] = new[] { "Fermeture auto conteneur", "Container autom. schließen", "自动关闭容器", "自動關閉容器", "コンテナ自動閉鎖", "컨테이너 자동 닫기", "Fechar Contêiner Auto", "Авто-закрытие контейнера", "Cerrar contenedor auto" },
+            ["Weapons"] = new[] { "Armes", "Waffen", "武器", "武器", "武器", "무기", "Armas", "Оружие", "Armas" },
+            ["Lootbox Highlight"] = new[] { "Surlignage des conteneurs", "Container-Hervorhebung", "战利品箱高亮", "戰利品箱高亮", "ルートボックス強調", "루트박스 강조", "Destaque de Caixas", "Подсветка контейнеров", "Resaltar cajas de botín" },
+            ["Quests"] = new[] { "Quêtes", "Aufgaben", "任务", "任務", "クエスト", "퀘스트", "Missões", "Задания", "Misiones" },
+            ["Recorded Items"] = new[] { "Objets enregistrés", "Erfasste Gegenstände", "已记录物品", "已記錄物品", "記録済みアイテム", "기록된 아이템", "Itens Registrados", "Записанные предметы", "Objetos registrados" },
+            ["FPS Counter"] = new[] { "Compteur FPS", "FPS-Anzeige", "帧率显示", "幀率顯示", "FPS表示", "FPS 카운터", "Contador FPS", "Счётчик FPS", "Contador FPS" },
+            ["Sleep Presets"] = new[] { "Préréglages de sommeil", "Schlaf-Voreinstellungen", "睡眠预设", "睡眠預設", "睡眠プリセット", "수면 프리셋", "Predefinições de Sono", "Пресеты сна", "Preajustes de sueño" },
+            // Toggle labels
+            ["Show sell value on hover"] = new[] { "Afficher la valeur de vente", "Verkaufswert anzeigen", "悬停显示售价", "懸停顯示售價", "売値をホバー表示", "호버 시 판매가 표시", "Mostrar valor de venda", "Показывать цену продажи", "Mostrar valor de venta" },
+            ["Show enemy names"] = new[] { "Afficher les noms ennemis", "Feindnamen anzeigen", "显示敌人名称", "顯示敵人名稱", "敵の名前を表示", "적 이름 표시", "Mostrar nomes inimigos", "Показывать имена врагов", "Mostrar nombres enemigos" },
+            ["Auto-unload gun on kill"] = new[] { "Décharger arme à la mort", "Waffe bei Tod entladen", "击杀时自动卸弹", "擊殺時自動卸彈", "キル時に自動アンロード", "처치 시 총알 제거", "Descarregar arma ao matar", "Авто-разрядка при убийстве", "Descargar arma al matar" },
+            ["Kill feed"] = new[] { "Fil de mort", "Kill-Feed", "击杀信息流", "擊殺信息流", "キルフィード", "킬 피드", "Feed de abates", "Лента убийств", "Feed de bajas" },
+            ["Modifier + click to transfer"] = new[] { "Modificateur + clic", "Modifiziertaste + Klick", "修饰键+点击转移", "修飾鍵+點擊轉移", "修飾キー+クリック移動", "수정키+클릭으로 이동", "Modificador + clique", "Модификатор + клик", "Modificador + clic" },
+            ["Close on movement"] = new[] { "Fermer au mouvement", "Bei Bewegung schließen", "移动时关闭", "移動時關閉", "移動で閉じる", "이동 시 닫기", "Fechar ao mover", "Закрыть при движении", "Cerrar al moverse" },
+            ["Close on Shift"] = new[] { "Fermer avec Shift", "Mit Shift schließen", "按Shift时关闭", "按Shift時關閉", "Shiftで閉じる", "Shift로 닫기", "Fechar com Shift", "Закрыть при Shift", "Cerrar con Shift" },
+            ["Close on Space"] = new[] { "Fermer avec Espace", "Mit Leertaste schließen", "按空格时关闭", "按空格時關閉", "スペースで閉じる", "스페이스로 닫기", "Fechar com Espaço", "Закрыть при Пробеле", "Cerrar con Espacio" },
+            ["Close on damage"] = new[] { "Fermer en cas de dégâts", "Bei Schaden schließen", "受伤时关闭", "受傷時關閉", "ダメージで閉じる", "피격 시 닫기", "Fechar ao tomar dano", "Закрыть при уроне", "Cerrar al recibir daño" },
+            ["Skip melee on scroll"] = new[] { "Ignorer mêlée au défilement", "Nahkampf beim Scrollen skippen", "滚轮跳过近战", "滾輪跳過近戰", "スクロールで近接スキップ", "스크롤 시 근접 건너뜀", "Pular melee no scroll", "Пропуск ближнего боя", "Saltar melee al girar" },
+            ["Highlight loot containers"] = new[] { "Surligner les conteneurs", "Loot-Container hervorheben", "高亮战利品容器", "高亮戰利品容器", "ルートコンテナを強調", "루트 컨테이너 강조", "Destacar contêineres", "Подсветка контейнеров", "Resaltar contenedores" },
+            ["Only unsearched"] = new[] { "Seulement non fouillés", "Nur Ungesucht", "仅未搜寻", "僅未搜尋", "未探索のみ", "미수색만", "Apenas não vasculhados", "Только необысканные", "Solo sin registrar" },
+            ["Quest favorites (N key)"] = new[] { "Favoris (touche N)", "Favoriten (Taste N)", "收藏任务 (N键)", "收藏任務 (N鍵)", "お気に入り (Nキー)", "즐겨찾기 (N키)", "Favoritos (tecla N)", "Избранные (клавиша N)", "Favoritos (tecla N)" },
+            ["Show badge on recorded items"] = new[] { "Badge sur objets enregistrés", "Badge auf erfassten Gegenst.", "显示已记录徽章", "顯示已記錄徽章", "記録済みバッジ表示", "기록된 아이템 뱃지", "Badge em itens registrados", "Значок на записанных", "Insignia en registrados" },
+            ["Show FPS counter"] = new[] { "Afficher compteur FPS", "FPS-Anzeige einblenden", "显示帧率计数器", "顯示幀率計數器", "FPSカウンターを表示", "FPS 카운터 표시", "Mostrar contador FPS", "Показывать счётчик FPS", "Mostrar contador FPS" },
+            ["Hide controls hint"] = new[] { "Masquer l'aide de contrôle", "Steuerungshinweis ausblenden", "隐藏操作提示", "隱藏操作提示", "操作ヒントを非表示", "조작 힌트 숨기기", "Ocultar dica de controles", "Скрыть подсказку управления", "Ocultar ayuda de controles" },
+            ["Remember camera view"] = new[] { "Mémoriser la vue caméra", "Kameraansicht merken", "记住相机视角", "記住相機視角", "カメラビューを記憶", "카메라 뷰 기억", "Lembrar visão de câmera", "Запомнить вид камеры", "Recordar vista de cámara" },
+            ["Wake-up preset buttons"] = new[] { "Boutons de réveil", "Aufwach-Schnelltasten", "醒来预设按钮", "醒來預設按鈕", "起床プリセット", "기상 프리셋 버튼", "Botões de acordar", "Кнопки пробуждения", "Botones de despertar" },
+            // Sub-labels
+            ["Display mode"] = new[] { "Mode d'affichage", "Anzeigemodus", "显示模式", "顯示模式", "表示モード", "표시 모드", "Modo de exibição", "Режим отображения", "Modo de visualización" },
+            ["Modifier key"] = new[] { "Touche modificatrice", "Modifiziertaste", "修饰键", "修飾鍵", "修飾キー", "수정 키", "Tecla modificadora", "Клавиша-модификатор", "Tecla modificadora" },
+            // Preset labels
+            ["Preset 1"] = new[] { "Préréglage 1", "Voreinstellung 1", "预设 1", "預設 1", "プリセット 1", "프리셋 1", "Predefinição 1", "Пресет 1", "Preajuste 1" },
+            ["Preset 2"] = new[] { "Préréglage 2", "Voreinstellung 2", "预设 2", "預設 2", "プリセット 2", "프리셋 2", "Predefinição 2", "Пресет 2", "Preajuste 2" },
+            ["Preset 3"] = new[] { "Préréglage 3", "Voreinstellung 3", "预设 3", "預設 3", "プリセット 3", "프리셋 3", "Predefinição 3", "Пресет 3", "Preajuste 3" },
+            ["Preset 4"] = new[] { "Préréglage 4", "Voreinstellung 4", "预设 4", "預設 4", "プリセット 4", "프리셋 4", "Predefinição 4", "Пресет 4", "Preajuste 4" },
+            // Close button
+            ["Close"] = new[] { "Fermer", "Schließen", "关闭", "關閉", "閉じる", "닫기", "Fechar", "Закрыть", "Cerrar" },
+            ["open / close"] = new[] { "ouvrir / fermer", "öffnen / schließen", "打开 / 关闭", "打開 / 關閉", "開く / 閉じる", "열기 / 닫기", "abrir / fechar", "открыть / закрыть", "abrir / cerrar" },
+            // Descriptions
+            ["Shows sell price at any time"] = new[] { "Affiche le prix de vente", "Zeigt Verkaufspreis jederzeit", "随时显示售价", "隨時顯示售價", "いつでも売値を表示", "언제든 판매가 표시", "Mostra preço de venda", "Показывает цену продажи", "Muestra precio de venta" },
+            ["Displayed above their health bar"] = new[] { "Au-dessus de la barre de vie", "Über der Lebensanzeige", "显示在血条上方", "顯示在血條上方", "ヘルスバーの上に表示", "체력바 위에 표시", "Exibido acima da barra de vida", "Отображается над полоской здоровья", "Sobre la barra de vida" },
+            ["Moves ammo to enemy stash when you kill them"] = new[] { "Munitions dans le loot ennemi", "Munition bei Tod in Loot", "击杀时弹药移至战利品", "擊殺時彈藥移至戰利品", "キル時に弾薬をスタッシュへ", "처치 시 탄약을 전리품으로", "Move munição para o loot", "Перемещает патроны в лут", "Mueve munición al botín" },
+            ["Shows kills in the top-right corner during raids"] = new[] { "Affiche les kills pendant raids", "Zeigt Kills während Raids", "突袭中显示击杀", "突襲中顯示擊殺", "レイド中にキルを表示", "레이드 중 킬 표시", "Mostra abates durante raids", "Показывает убийства в рейде", "Muestra bajas durante raids" },
+            ["Moves items between container and backpack"] = new[] { "Entre conteneur et sac à dos", "Zwischen Container und Rucksack", "物品在容器和背包间移动", "物品在容器和背包間移動", "コンテナとバッグ間でアイテム移動", "컨테이너와 백팩 간 이동", "Move itens entre contêiner e mochila", "Между контейнером и рюкзаком", "Mueve entre contenedor y mochila" },
+            ["W / A / S / D keys"] = new[] { "Touches W / A / S / D", "W / A / S / D Tasten", "W/A/S/D键", "W/A/S/D鍵", "W/A/S/Dキー", "W/A/S/D 키", "Teclas W/A/S/D", "Клавиши W/A/S/D", "Teclas W/A/S/D" },
+            ["When pressing Shift"] = new[] { "En appuyant sur Shift", "Beim Drücken von Shift", "按下Shift时", "按下Shift時", "Shiftを押したとき", "Shift 누를 때", "Ao pressionar Shift", "При нажатии Shift", "Al presionar Shift" },
+            ["When pressing Space"] = new[] { "En appuyant sur Espace", "Beim Drücken der Leertaste", "按下空格时", "按下空格時", "スペースを押したとき", "스페이스 누를 때", "Ao pressionar Espaço", "При нажатии Пробела", "Al presionar Espacio" },
+            ["When taking a hit"] = new[] { "En prenant un coup", "Beim Treffer", "受到攻击时", "受到攻擊時", "ヒットを受けたとき", "피격 시", "Ao receber dano", "При получении урона", "Al recibir un golpe" },
+            ["Scroll wheel skips the melee slot"] = new[] { "La molette ignore la mêlée", "Mausrad überspringt Nahkampf", "滚轮跳过近战槽", "滾輪跳過近戰槽", "スクロールで近接スロットスキップ", "스크롤로 근접 슬롯 건너뜀", "Roda pula o slot de melee", "Прокрутка пропускает ближний бой", "Rueda omite el cuerpo a cuerpo" },
+            ["Gold outline on loot boxes in the world"] = new[] { "Contour doré sur les caisses", "Goldener Umriss auf Loot-Kisten", "战利品箱金色边框", "戰利品箱金色邊框", "ルートボックスに金縁", "루트 박스에 금테", "Contorno dourado nas caixas", "Золотой контур на контейнерах", "Contorno dorado en cajas" },
+            ["Hides outline on already-opened containers"] = new[] { "Cache contour des déjà ouverts", "Versteckt Umriss geöffneter Behälter", "隐藏已打开容器的边框", "隱藏已打開容器的邊框", "開けたコンテナの縁を隠す", "열린 컨테이너 외곽선 숨김", "Oculta contorno de já abertos", "Скрывает контур открытых контейнеров", "Oculta contorno de abiertos" },
+            ["Press N on a selected quest to pin it to the top of the list"] = new[] { "N pour épingler la quête", "N drücken zum Anheften", "按N固定任务至顶部", "按N固定任務至頂部", "NでクエストをTOPに固定", "퀘스트 선택 후 N로 상단 고정", "Pressione N para fixar missão", "Нажмите N чтобы закрепить задание", "Presiona N para fijar misión" },
+            ["Green ✓ on blueprints and master keys"] = new[] { "✓ vert sur blueprints et clés", "Grünes ✓ auf Blueprints und Schlüsseln", "蓝图和主钥匙上绿色✓", "藍圖和主鑰匙上綠色✓", "設計図とマスターキーに緑✓", "설계도와 마스터키에 녹색✓", "✓ verde em blueprints e chaves", "Зелёный ✓ на чертежах и ключах", "✓ verde en blueprints y llaves" },
+            ["Displayed in the top-right corner"] = new[] { "Affiché en haut à droite", "Oben rechts angezeigt", "显示在右上角", "顯示在右上角", "右上に表示", "우측 상단에 표시", "Exibido no canto superior direito", "Отображается в правом верхнем углу", "Mostrado en esquina superior derecha" },
+            ["Hides the 'Controls [O]' button in the HUD"] = new[] { "Cache le bouton 'Contrôles [O]'", "Versteckt 'Steuerung [O]'-Taste", "隐藏'操作[O]'按钮", "隱藏'操作[O]'按鈕", "'操作[O]'ボタンを非表示", "'조작[O]' 버튼 숨기기", "Oculta botão 'Controles [O]'", "Скрывает кнопку 'Управление [O]'", "Oculta botón 'Controles [O]'" },
+            ["Restores top-down or default view between sessions"] = new[] { "Restaure la vue entre sessions", "Stellt Ansicht zwischen Sessions her", "会话间恢复相机视角", "會話間恢復相機視角", "セッション間でビューを復元", "세션 간 뷰 복원", "Restaura visão entre sessões", "Восстанавливает вид между сессиями", "Restaura vista entre sesiones" },
+            ["Adds preset buttons to the sleep screen"] = new[] { "Ajoute des boutons de réveil", "Fügt Schlaf-Schnelltasten hinzu", "在睡眠界面添加预设按钮", "在睡眠介面添加預設按鈕", "睡眠画面にプリセットボタン追加", "수면 화면에 프리셋 버튼 추가", "Adiciona botões na tela de dormir", "Добавляет кнопки на экран сна", "Añade botones en pantalla de sueño" },
+        };
+
+        private static string L(string key)
+        {
+            var lang = GetGameLanguage();
+            int idx = Array.IndexOf(_langOrder, lang);
+            if (idx >= 0 && _t.TryGetValue(key, out var arr) && idx < arr.Length)
+                return arr[idx];
+            return key;
+        }
+
+        private void RebuildSettingsPanel()
+        {
+            bool wasOpen = _menuOpen;
+            if (_settingsCanvas != null) { UnityEngine.Object.Destroy(_settingsCanvas); _settingsCanvas = null; _settingsCanvasComp = null; }
+            BuildSettingsPanel();
+            if (wasOpen) SetMenuVisible(true);
+        }
+
         // ── Settings Panel ────────────────────────────────────────────────
 
         private void BuildSettingsPanel()
         {
+            _lastLang = GetGameLanguage();
             _settingsCanvas = new GameObject("AllInOneMod_m0n0t0ny_Canvas");
             DontDestroyOnLoad(_settingsCanvas);
             var canvas = _settingsCanvas.AddComponent<Canvas>();
@@ -1555,7 +1674,7 @@ namespace AllInOneMod_m0n0t0ny
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.6", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.7", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1593,16 +1712,16 @@ namespace AllInOneMod_m0n0t0ny
             var col3 = LColumn(content, "Col3");
 
             // ── COL 1: Item Value ─────────────────────────────────────────
-            var c1v = LCard(col1, "Item Value");
+            var c1v = LCard(col1, L("Item Value"));
 
-            var (tRow, tImg, tThumb) = LToggleRow(c1v, "Show sell value on hover",
-                "Visible always, not just in shops");
+            var (tRow, tImg, tThumb) = LToggleRow(c1v, L("Show sell value on hover"),
+                L("Shows sell price at any time"));
             _toggleBtnImage = tImg;
             _toggleBtnThumb = tThumb;
             tRow.GetComponentInChildren<Button>().onClick.AddListener(OnToggleClicked);
             RefreshToggleButton();
 
-            LSubLabel(c1v, "Display mode");
+            LSubLabel(c1v, L("Display mode"));
 
             var modeRow = LChild(c1v, "ModeRow", 30f);
             modeRow.GetComponent<Image>().color = Color.clear;
@@ -1622,40 +1741,40 @@ namespace AllInOneMod_m0n0t0ny
             RefreshModeButtons();
 
             // ── COL 1: Enemies ────────────────────────────────────────────
-            var c1e = LCard(col1, "Enemies");
+            var c1e = LCard(col1, L("Enemies"));
 
-            var (enRow, enImg, enThumb) = LToggleRow(c1e, "Show enemy names",
-                "Displayed above their health bar");
+            var (enRow, enImg, enThumb) = LToggleRow(c1e, L("Show enemy names"),
+                L("Displayed above their health bar"));
             _enemyNamesToggleImage = enImg;
             _enemyNamesToggleThumb = enThumb;
             enRow.GetComponentInChildren<Button>().onClick.AddListener(OnEnemyNamesToggleClicked);
             RefreshEnemyNamesToggle();
 
-            var (auRow, auImg, auThumb) = LToggleRow(c1e, "Auto-unload gun on kill",
-                "Moves ammo to enemy stash when you kill them");
+            var (auRow, auImg, auThumb) = LToggleRow(c1e, L("Auto-unload gun on kill"),
+                L("Moves ammo to enemy stash when you kill them"));
             _autoUnloadToggleImage = auImg;
             _autoUnloadToggleThumb = auThumb;
             auRow.GetComponentInChildren<Button>().onClick.AddListener(OnAutoUnloadToggleClicked);
             RefreshAutoUnloadToggle();
 
-            var (kfRow, kfImg, kfThumb) = LToggleRow(c1e, "Kill feed",
-                "Shows kills in the top-right corner during raids");
+            var (kfRow, kfImg, kfThumb) = LToggleRow(c1e, L("Kill feed"),
+                L("Shows kills in the top-right corner during raids"));
             _killFeedToggleImage = kfImg;
             _killFeedToggleThumb = kfThumb;
             kfRow.GetComponentInChildren<Button>().onClick.AddListener(OnKillFeedToggleClicked);
             RefreshKillFeedToggle();
 
             // ── COL 1: Item Transfer ──────────────────────────────────────
-            var c1t = LCard(col1, "Item Transfer");
+            var c1t = LCard(col1, L("Item Transfer"));
 
-            var (trRow, trImg, trThumb) = LToggleRow(c1t, "Modifier + click to transfer",
-                "Moves items between container and backpack");
+            var (trRow, trImg, trThumb) = LToggleRow(c1t, L("Modifier + click to transfer"),
+                L("Moves items between container and backpack"));
             _transferToggleImage = trImg;
             _transferToggleThumb = trThumb;
             trRow.GetComponentInChildren<Button>().onClick.AddListener(OnTransferToggleClicked);
             RefreshTransferToggle();
 
-            LSubLabel(c1t, "Modifier key");
+            LSubLabel(c1t, L("Modifier key"));
 
             var modRow = LChild(c1t, "ModRow", 30f);
             modRow.GetComponent<Image>().color = Color.clear;
@@ -1685,14 +1804,14 @@ namespace AllInOneMod_m0n0t0ny
             RefreshShiftConflict();
 
             // ── COL 2: Auto-Close Container ───────────────────────────────
-            var c2ac = LCard(col2, "Auto-Close Container");
+            var c2ac = LCard(col2, L("Auto-Close Container"));
 
             var acLabels = new (string name, string desc)[]
             {
-                ("Close on movement", "W / A / S / D keys"),
-                ("Close on Shift",    "When pressing Shift"),
-                ("Close on Space",    "When pressing Space"),
-                ("Close on damage",   "When taking a hit"),
+                (L("Close on movement"), L("W / A / S / D keys")),
+                (L("Close on Shift"),    L("When pressing Shift")),
+                (L("Close on Space"),    L("When pressing Space")),
+                (L("Close on damage"),   L("When taking a hit")),
             };
             _autoCloseBtnImages = new Image[4];
             _autoCloseBtnThumbs = new RectTransform[4];
@@ -1707,87 +1826,87 @@ namespace AllInOneMod_m0n0t0ny
             RefreshAutoCloseToggles();
 
             // ── COL 2: Weapons ────────────────────────────────────────────
-            var c2w = LCard(col2, "Weapons");
+            var c2w = LCard(col2, L("Weapons"));
 
-            var (smRow, smImg, smThumb) = LToggleRow(c2w, "Skip melee on scroll",
-                "Scroll wheel skips the melee slot");
+            var (smRow, smImg, smThumb) = LToggleRow(c2w, L("Skip melee on scroll"),
+                L("Scroll wheel skips the melee slot"));
             _skipMeleeToggleImage = smImg;
             _skipMeleeToggleThumb = smThumb;
             smRow.GetComponentInChildren<Button>().onClick.AddListener(OnSkipMeleeToggleClicked);
             RefreshSkipMeleeToggle();
 
             // ── COL 2: Lootbox Highlight ──────────────────────────────────
-            var c2lb = LCard(col2, "Lootbox Highlight");
+            var c2lb = LCard(col2, L("Lootbox Highlight"));
 
-            var (lbRow, lbImg, lbThumb) = LToggleRow(c2lb, "Highlight loot containers",
-                "Gold outline on loot boxes in the world");
+            var (lbRow, lbImg, lbThumb) = LToggleRow(c2lb, L("Highlight loot containers"),
+                L("Gold outline on loot boxes in the world"));
             _lootboxHLToggleImage = lbImg;
             _lootboxHLToggleThumb = lbThumb;
             lbRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLToggleClicked);
             RefreshLootboxHLToggle();
 
-            var (lbuRow, lbuImg, lbuThumb) = LToggleRow(c2lb, "Only unsearched",
-                "Hides outline on already-opened containers");
+            var (lbuRow, lbuImg, lbuThumb) = LToggleRow(c2lb, L("Only unsearched"),
+                L("Hides outline on already-opened containers"));
             _lootboxHLUnsearchedToggleImage = lbuImg;
             _lootboxHLUnsearchedToggleThumb = lbuThumb;
             lbuRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLUnsearchedToggleClicked);
             RefreshLootboxHLUnsearchedToggle();
 
             // ── COL 2: Quest Favorites ────────────────────────────────────
-            var c2qf = LCard(col2, "Quests");
+            var c2qf = LCard(col2, L("Quests"));
 
-            var (qfRow, qfImg, qfThumb) = LToggleRow(c2qf, "Quest favorites (N key)",
-                "Press N on a selected quest to pin it to the top of the list");
+            var (qfRow, qfImg, qfThumb) = LToggleRow(c2qf, L("Quest favorites (N key)"),
+                L("Press N on a selected quest to pin it to the top of the list"));
             _questFavToggleImage = qfImg;
             _questFavToggleThumb = qfThumb;
             qfRow.GetComponentInChildren<Button>().onClick.AddListener(OnQuestFavToggleClicked);
             RefreshQuestFavToggle();
 
             // ── COL 3: Recorded Items ─────────────────────────────────────
-            var c3fr = LCard(col3, "Recorded Items");
+            var c3fr = LCard(col3, L("Recorded Items"));
 
-            var (frRow, frImg, frThumb) = LToggleRow(c3fr, "Show badge on recorded items",
-                "Green ✓ on blueprints and master keys");
+            var (frRow, frImg, frThumb) = LToggleRow(c3fr, L("Show badge on recorded items"),
+                L("Green ✓ on blueprints and master keys"));
             _recorderToggleImage = frImg;
             _recorderToggleThumb = frThumb;
             frRow.GetComponentInChildren<Button>().onClick.AddListener(OnRecorderBadgeToggleClicked);
             RefreshRecorderBadgeToggle();
 
             // ── COL 3: FPS Counter ────────────────────────────────────────
-            var c3fps = LCard(col3, "FPS Counter");
+            var c3fps = LCard(col3, L("FPS Counter"));
 
-            var (fpsRow, fpsImg, fpsThumb) = LToggleRow(c3fps, "Show FPS counter",
-                "Displayed in the top-right corner");
+            var (fpsRow, fpsImg, fpsThumb) = LToggleRow(c3fps, L("Show FPS counter"),
+                L("Displayed in the top-right corner"));
             _fpsToggleImage = fpsImg;
             _fpsToggleThumb = fpsThumb;
             fpsRow.GetComponentInChildren<Button>().onClick.AddListener(OnFpsToggleClicked);
             RefreshFpsToggle();
 
-            var (hcRow, hcImg, hcThumb) = LToggleRow(c3fps, "Hide controls hint",
-                "Hides the 'Controls [O]' button in the HUD");
+            var (hcRow, hcImg, hcThumb) = LToggleRow(c3fps, L("Hide controls hint"),
+                L("Hides the 'Controls [O]' button in the HUD"));
             _hideCtrlToggleImage = hcImg;
             _hideCtrlToggleThumb = hcThumb;
             hcRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideCtrlToggleClicked);
             RefreshHideCtrlToggle();
 
-            var (cvRow, cvImg, cvThumb) = LToggleRow(c3fps, "Remember camera view",
-                "Restores top-down or default view between sessions");
+            var (cvRow, cvImg, cvThumb) = LToggleRow(c3fps, L("Remember camera view"),
+                L("Restores top-down or default view between sessions"));
             _cameraViewToggleImage = cvImg;
             _cameraViewToggleThumb = cvThumb;
             cvRow.GetComponentInChildren<Button>().onClick.AddListener(OnCameraViewToggleClicked);
             RefreshCameraViewToggle();
 
             // ── COL 3: Sleep Presets ──────────────────────────────────────
-            var c3sp = LCard(col3, "Sleep Presets");
+            var c3sp = LCard(col3, L("Sleep Presets"));
 
-            var (stRow, stImg, stThumb) = LToggleRow(c3sp, "Wake-up preset buttons",
-                "Adds preset buttons to the sleep screen");
+            var (stRow, stImg, stThumb) = LToggleRow(c3sp, L("Wake-up preset buttons"),
+                L("Adds preset buttons to the sleep screen"));
             _sleepToggleImage = stImg;
             _sleepToggleThumb = stThumb;
             stRow.GetComponentInChildren<Button>().onClick.AddListener(OnSleepToggleClicked);
             RefreshSleepToggle();
 
-            LPickerRow(c3sp, "Preset 1",
+            LPickerRow(c3sp, L("Preset 1"),
                 () => _preset1Hour,
                 v =>
                 {
@@ -1801,7 +1920,7 @@ namespace AllInOneMod_m0n0t0ny
                     if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
                 });
 
-            LPickerRow(c3sp, "Preset 2",
+            LPickerRow(c3sp, L("Preset 2"),
                 () => _preset2Hour,
                 v =>
                 {
@@ -1815,7 +1934,7 @@ namespace AllInOneMod_m0n0t0ny
                     if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
                 });
 
-            LPickerRow(c3sp, "Preset 3",
+            LPickerRow(c3sp, L("Preset 3"),
                 () => _preset3Hour,
                 v =>
                 {
@@ -1829,7 +1948,7 @@ namespace AllInOneMod_m0n0t0ny
                     if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
                 });
 
-            LPickerRow(c3sp, "Preset 4",
+            LPickerRow(c3sp, L("Preset 4"),
                 () => _preset4Hour,
                 v =>
                 {
@@ -1867,13 +1986,13 @@ namespace AllInOneMod_m0n0t0ny
             var cTxtGo = new GameObject("T");
             cTxtGo.transform.SetParent(closeGo.transform, false);
             var cTMP = cTxtGo.AddComponent<TextMeshProUGUI>();
-            cTMP.text = $"Close  [{MENU_KEY}]"; cTMP.fontSize = 12f;
+            cTMP.text = $"{L("Close")}  [{MENU_KEY}]"; cTMP.fontSize = 12f;
             cTMP.alignment = TextAlignmentOptions.Center; cTMP.color = Color.white;
             var cTr = cTxtGo.GetComponent<RectTransform>();
             cTr.anchorMin = Vector2.zero; cTr.anchorMax = Vector2.one;
             cTr.sizeDelta = Vector2.zero; cTr.anchoredPosition = Vector2.zero;
 
-            var hintGo = LText(bottom, "Hint", $"[{MENU_KEY}]  open / close", 9f, flexW: 1f);
+            var hintGo = LText(bottom, "Hint", $"[{MENU_KEY}]  {L("open / close")}", 9f, flexW: 1f);
             var hintTMP = hintGo.GetComponent<TextMeshProUGUI>();
             hintTMP.color = new Color(0.28f, 0.28f, 0.35f, 1f);
             hintTMP.alignment = TextAlignmentOptions.Right;
@@ -2395,22 +2514,45 @@ namespace AllInOneMod_m0n0t0ny
             catch { }
             if (!ready) return;
 
-            // Booleans
-            MCAddBool(PREF_ENABLED, "Show sell value on hover", _showValue);
-            MCAddBool(PREF_ENEMY_NAMES, "Show enemy names", _showEnemyNames);
-            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled", _transferEnabled);
-            MCAddBool(PREF_AC_WASD, "Auto-close on movement (WASD)", _autoCloseOnWASD);
-            MCAddBool(PREF_AC_SHIFT, "Auto-close on Shift", _autoCloseOnShift);
-            MCAddBool(PREF_AC_SPACE, "Auto-close on Space", _autoCloseOnSpace);
-            MCAddBool(PREF_AC_DAMAGE, "Auto-close on damage", _autoCloseOnDamage);
+            // Registered in reverse display order: ModConfig shows entries bottom-up,
+            // so the last registered setting appears at the top of the list.
+
+            // Sliders (sleep presets) - displayed last, registered first
+            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour", typeof(int), _preset4Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour", typeof(int), _preset3Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour", typeof(int), _preset2Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour", typeof(int), _preset1Hour, new Vector2(0, 23));
+
             MCAddBool(PREF_SLEEP_ENABLED, "Sleep preset buttons", _sleepPresetsEnabled);
-            MCAddBool(PREF_RECORDER_BADGE, "Recorded items badge", _showRecorderBadge);
-            MCAddBool(PREF_FPS_COUNTER, "FPS counter", _showFps);
-            MCAddBool(PREF_AUTO_UNLOAD, "Auto-unload gun on kill", _autoUnloadEnabled);
-            MCAddBool(PREF_LOOTBOX_HL, "Lootbox highlight", _lootboxHLEnabled);
-            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_CAMERA_VIEW, "Remember camera view", _cameraViewPersist);
+            MCAddBool(PREF_HIDE_CTRL, "Hide controls hint", _hideCtrlHint);
+            MCAddBool(PREF_QUEST_FAV, "Quest favorites (N key)", _questFavEnabled);
             MCAddBool(PREF_KILL_FEED, "Kill feed", _killFeedEnabled);
+            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_LOOTBOX_HL, "Lootbox highlight", _lootboxHLEnabled);
+            MCAddBool(PREF_AUTO_UNLOAD, "Auto-unload gun on kill", _autoUnloadEnabled);
+            MCAddBool(PREF_FPS_COUNTER, "FPS counter", _showFps);
+            MCAddBool(PREF_RECORDER_BADGE, "Recorded items badge", _showRecorderBadge);
+            MCAddBool(PREF_AC_DAMAGE, "Auto-close on damage", _autoCloseOnDamage);
+            MCAddBool(PREF_AC_SPACE, "Auto-close on Space", _autoCloseOnSpace);
+            MCAddBool(PREF_AC_WASD, "Auto-close on movement (WASD)", _autoCloseOnWASD);
+            MCAddBool(PREF_AC_SHIFT, "Auto-close on Shift/Alt", _autoCloseOnShift);
+
             // Dropdowns
+            var modOpts = new SortedDictionary<string, object>
+            {
+                { "Shift", (int)TransferModifier.Shift },
+                { "Alt",   (int)TransferModifier.Alt   },
+            };
+            MCAddDropdown(PREF_TRANSFER_MOD, "Transfer modifier key", modOpts, typeof(int), (int)_transferModifier);
+
+            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled", _transferEnabled);
+            MCAddBool(PREF_ENEMY_NAMES, "Show enemy names", _showEnemyNames);
+
             var modeOpts = new SortedDictionary<string, object>
             {
                 { "Combined",    (int)DisplayMode.Combined    },
@@ -2419,22 +2561,8 @@ namespace AllInOneMod_m0n0t0ny
             };
             MCAddDropdown(PREF_MODE, "Sell value display mode", modeOpts, typeof(int), (int)_mode);
 
-            var modOpts = new SortedDictionary<string, object>
-            {
-                { "Shift", (int)TransferModifier.Shift },
-                { "Alt",   (int)TransferModifier.Alt   },
-            };
-            MCAddDropdown(PREF_TRANSFER_MOD, "Transfer modifier key", modOpts, typeof(int), (int)_transferModifier);
-
-            // Sliders
-            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour", typeof(int), _preset1Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour", typeof(int), _preset2Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour", typeof(int), _preset3Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour", typeof(int), _preset4Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min, new Vector2(0, 50));
+            // Last registered = first displayed
+            MCAddBool(PREF_ENABLED, "Show sell value on hover", _showValue);
 
             // Change delegate
             try
@@ -2497,6 +2625,12 @@ namespace AllInOneMod_m0n0t0ny
             { _lootboxHLOnlyUnsearched = MCLoadBool(key, _lootboxHLOnlyUnsearched); PlayerPrefs.SetInt(key, _lootboxHLOnlyUnsearched ? 1 : 0); RefreshLootboxHLUnsearchedToggle(); }
             else if (key == PREF_KILL_FEED)
             { _killFeedEnabled = MCLoadBool(key, _killFeedEnabled); PlayerPrefs.SetInt(key, _killFeedEnabled ? 1 : 0); RefreshKillFeedToggle(); }
+            else if (key == PREF_QUEST_FAV)
+            { _questFavEnabled = MCLoadBool(key, _questFavEnabled); PlayerPrefs.SetInt(key, _questFavEnabled ? 1 : 0); RefreshQuestFavToggle(); }
+            else if (key == PREF_HIDE_CTRL)
+            { _hideCtrlHint = MCLoadBool(key, _hideCtrlHint); PlayerPrefs.SetInt(key, _hideCtrlHint ? 1 : 0); RefreshHideCtrlToggle(); ApplyCtrlHintSetting(); }
+            else if (key == PREF_CAMERA_VIEW)
+            { _cameraViewPersist = MCLoadBool(key, _cameraViewPersist); PlayerPrefs.SetInt(key, _cameraViewPersist ? 1 : 0); RefreshCameraViewToggle(); }
             else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
             {
                 _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
