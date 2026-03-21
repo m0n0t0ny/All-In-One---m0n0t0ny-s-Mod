@@ -26,6 +26,7 @@ namespace AllInOneMod_m0n0t0ny
         // ── PlayerPrefs keys ──────────────────────────────────────────────
         private const string PREF_ENABLED = "DisplayItemValue_Enabled";
         private const string PREF_MODE = "DisplayItemValue_Mode";
+        private const string PREF_SELL_COMBO = "DisplayItemValue_SellCombo";
         private const string PREF_SLEEP_ENABLED = "DisplayItemValue_SleepEnabled";
         private const string PREF_PRESET1H = "DisplayItemValue_Preset1H";
         private const string PREF_PRESET1M = "DisplayItemValue_Preset1M";
@@ -158,7 +159,9 @@ namespace AllInOneMod_m0n0t0ny
         private static Type? _mcAPI;
         private bool _mcChecked;
         private bool _mcDelegateRegistered;
+        private bool _mcSavedRegistered;
         private Action<string>? _mcDelegate;
+        private int _mcPollFrame;
 
         // ── Factory Recorder badge ────────────────────────────────────────
         private const string PREF_RECORDER_BADGE = "DisplayItemValue_RecorderBadge";
@@ -253,6 +256,7 @@ namespace AllInOneMod_m0n0t0ny
         {
             _showValue = PlayerPrefs.GetInt(PREF_ENABLED, 1) == 1;
             _mode = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
+            if (!PlayerPrefs.HasKey(PREF_SELL_COMBO)) SaveSellComboPrefs();
             _showEnemyNames = PlayerPrefs.GetInt(PREF_ENEMY_NAMES, 1) == 1;
             _transferEnabled = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
             _transferModifier = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
@@ -331,6 +335,9 @@ namespace AllInOneMod_m0n0t0ny
                 foreach (var b in _disabledInputControls)
                     if (b != null) b.enabled = true;
                 _disabledInputControls.Clear();
+
+                // Sync F9 changes to ModConfig on panel close
+                SyncAllToModConfig();
             }
         }
 
@@ -421,6 +428,10 @@ namespace AllInOneMod_m0n0t0ny
         void Update()
         {
             if (!_mcChecked) TryInitModConfig();
+            if (_mcChecked && _mcAPI != null && !_menuOpen)
+            {
+                if (++_mcPollFrame >= 60) { _mcPollFrame = 0; OnModConfigSaved(); }
+            }
             var curLang = GetGameLanguage();
             if (_lastLang != SystemLanguage.Unknown && curLang != _lastLang)
                 RebuildSettingsPanel();
@@ -1619,11 +1630,13 @@ namespace AllInOneMod_m0n0t0ny
             ["Auto-close on Space"] = new[] { "Fermeture auto sur Espace", "Auto-Schließen bei Leertaste", "按空格时自动关闭", "按空格時自動關閉", "スペースで自動閉鎖", "스페이스로 자동 닫기", "Fechar auto com Espaço", "Авто-закрытие при Пробеле", "Cerrar auto con Espacio" },
             ["Auto-close on damage"] = new[] { "Fermeture auto aux dégâts", "Auto-Schließen bei Schaden", "受伤时自动关闭", "受傷時自動關閉", "ダメージで自動閉鎖", "피격 시 자동 닫기", "Fechar auto ao tomar dano", "Авто-закрытие при уроне", "Cerrar auto al recibir daño" },
             ["Sell value display mode"] = new[] { "Mode d'affichage de la valeur", "Anzeigemodus für Verkaufswert", "售价显示模式", "售價顯示模式", "売値表示モード", "판매가 표시 모드", "Modo de exibição de valor", "Режим отображения цены", "Modo de visualización de valor" },
+            ["Sell value on hover"] = new[] { "Valeur de vente au survol", "Verkaufswert beim Hover", "悬停售价", "懸停售價", "ホバー時の売値", "호버 시 판매가", "Valor de venda ao passar", "Цена продажи при наведении", "Valor de venta al pasar" },
             ["Combined"] = new[] { "Combiné", "Kombiniert", "组合", "組合", "複合", "복합", "Combinado", "Комбинированный", "Combinado" },
             ["Single only"] = new[] { "Unité seulement", "Nur einzeln", "仅单个", "僅單個", "単体のみ", "단일만", "Somente unitário", "Только единица", "Solo unitario" },
             ["Stack only"] = new[] { "Pile seulement", "Nur Stapel", "仅堆叠", "僅堆疊", "スタックのみ", "스택만", "Somente pilha", "Только стопка", "Solo pila" },
             ["Item transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de item", "Перенос предметов", "Transferencia de objetos" },
             ["Disabled"] = new[] { "Désactivé", "Deaktiviert", "禁用", "禁用", "無効", "비활성화", "Desativado", "Отключено", "Desactivado" },
+            ["Enabled"]  = new[] { "Activé", "Aktiviert", "启用", "啟用", "有効", "활성화", "Ativado", "Включено", "Activado" },
             ["Shift + Left Click"] = new[] { "Shift+Clic gauche", "Shift+Linksklick", "Shift+左键单击", "Shift+左鍵單擊", "Shift+左クリック", "Shift+좌클릭", "Shift+Clique esquerdo", "Shift+Левый клик", "Shift+Clic izquierdo" },
             ["Alt + Left Click"] = new[] { "Alt+Clic gauche", "Alt+Linksklick", "Alt+左键单击", "Alt+左鍵單擊", "Alt+左クリック", "Alt+좌클릭", "Alt+Clique esquerdo", "Alt+Левый клик", "Alt+Clic izquierdo" },
             ["Preset 1 - hour"] = new[] { "Prérégl. 1 - heure", "Voreinst. 1 - Stunde", "预设 1 - 小时", "預設 1 - 小時", "プリセット 1 - 時間", "프리셋 1 - 시간", "Predefinição 1 - hora", "Пресет 1 - час", "Preajuste 1 - hora" },
@@ -1704,7 +1717,7 @@ namespace AllInOneMod_m0n0t0ny
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.7", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.8", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -2276,10 +2289,21 @@ namespace AllInOneMod_m0n0t0ny
 
         // ── Settings callbacks ────────────────────────────────────────────
 
+        private void SaveSellComboPrefs()
+        {
+            int v = !_showValue ? 0 : _mode switch {
+                DisplayMode.SingleOnly => 1,
+                DisplayMode.StackOnly  => 2,
+                _                      => 3,
+            };
+            PlayerPrefs.SetInt(PREF_SELL_COMBO, v);
+        }
+
         private void OnToggleClicked()
         {
             _showValue = !_showValue;
             PlayerPrefs.SetInt(PREF_ENABLED, _showValue ? 1 : 0);
+            SaveSellComboPrefs();
             PlayerPrefs.Save();
             RefreshToggleButton();
         }
@@ -2288,6 +2312,7 @@ namespace AllInOneMod_m0n0t0ny
         {
             _mode = mode;
             PlayerPrefs.SetInt(PREF_MODE, (int)_mode);
+            SaveSellComboPrefs();
             PlayerPrefs.Save();
             RefreshModeButtons();
         }
@@ -2557,20 +2582,21 @@ namespace AllInOneMod_m0n0t0ny
             MCAddSlider(PREF_PRESET1M, L("Preset 1 - min"), typeof(int), _preset1Min, new Vector2(0, 50));
             MCAddSlider(PREF_PRESET1H, L("Preset 1 - hour"), typeof(int), _preset1Hour, new Vector2(0, 23));
 
-            MCAddBool(PREF_SLEEP_ENABLED, L("Sleep preset buttons"), _sleepPresetsEnabled);
+            MCAddBool(PREF_SLEEP_ENABLED, L("Wake-up preset buttons"), _sleepPresetsEnabled);
             MCAddBool(PREF_CAMERA_VIEW, L("Remember camera view"), _cameraViewPersist);
             MCAddBool(PREF_HIDE_CTRL, L("Hide controls hint"), _hideCtrlHint);
             MCAddBool(PREF_QUEST_FAV, L("Quest favorites (N key)"), _questFavEnabled);
             MCAddBool(PREF_KILL_FEED, L("Kill feed"), _killFeedEnabled);
-            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, L("Lootbox highlight: only unsearched"), _lootboxHLOnlyUnsearched);
-            MCAddBool(PREF_LOOTBOX_HL, L("Lootbox highlight"), _lootboxHLEnabled);
+            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, L("Only unsearched"), _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_LOOTBOX_HL, L("Highlight loot containers"), _lootboxHLEnabled);
+            MCAddBool(PREF_SKIP_MELEE, L("Skip melee on scroll"), _skipMeleeOnScroll);
             MCAddBool(PREF_AUTO_UNLOAD, L("Auto-unload gun on kill"), _autoUnloadEnabled);
-            MCAddBool(PREF_FPS_COUNTER, L("FPS counter"), _showFps);
-            MCAddBool(PREF_RECORDER_BADGE, L("Recorded items badge"), _showRecorderBadge);
-            MCAddBool(PREF_AC_DAMAGE, L("Auto-close on damage"), _autoCloseOnDamage);
-            MCAddBool(PREF_AC_SPACE, L("Auto-close on Space"), _autoCloseOnSpace);
-            MCAddBool(PREF_AC_SHIFT, L("Auto-close on Shift"), _autoCloseOnShift);
-            MCAddBool(PREF_AC_WASD, L("Auto-close on movement (WASD)"), _autoCloseOnWASD);
+            MCAddBool(PREF_FPS_COUNTER, L("Show FPS counter"), _showFps);
+            MCAddBool(PREF_RECORDER_BADGE, L("Show badge on recorded items"), _showRecorderBadge);
+            MCAddBool(PREF_AC_DAMAGE, L("Close on damage"), _autoCloseOnDamage);
+            MCAddBool(PREF_AC_SPACE, L("Close on Space"), _autoCloseOnSpace);
+            MCAddBool(PREF_AC_SHIFT, L("Close on Shift"), _autoCloseOnShift);
+            MCAddBool(PREF_AC_WASD, L("Close on movement"), _autoCloseOnWASD);
 
             // Unified item transfer dropdown: Disabled / Shift + Left Click / Alt + Left Click
             var transferComboOpts = new SortedDictionary<string, object>
@@ -2580,20 +2606,24 @@ namespace AllInOneMod_m0n0t0ny
                 { L("Alt + Left Click"),   2 },
             };
             int transferComboDefault = !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2);
-            MCAddDropdown(PREF_TRANSFER_COMBO, L("Item transfer"), transferComboOpts, typeof(int), transferComboDefault);
+            MCAddDropdown(PREF_TRANSFER_COMBO, L("Modifier + click to transfer"), transferComboOpts, typeof(int), transferComboDefault);
 
             MCAddBool(PREF_ENEMY_NAMES, L("Show enemy names"), _showEnemyNames);
 
-            var modeOpts = new SortedDictionary<string, object>
-            {
-                { L("Combined"),    (int)DisplayMode.Combined    },
-                { L("Single only"), (int)DisplayMode.SingleOnly  },
-                { L("Stack only"),  (int)DisplayMode.StackOnly   },
-            };
-            MCAddDropdown(PREF_MODE, L("Sell value display mode"), modeOpts, typeof(int), (int)_mode);
-
             // Last registered = first displayed
-            MCAddBool(PREF_ENABLED, L("Show sell value on hover"), _showValue);
+            int sellComboDefault = !_showValue ? 0 : _mode switch {
+                DisplayMode.SingleOnly => 1,
+                DisplayMode.StackOnly  => 2,
+                _                      => 3,
+            };
+            var sellComboOpts = new SortedDictionary<string, object>
+            {
+                { L("Disabled"),     0 },
+                { L("Single only"),  1 },
+                { L("Stack only"),   2 },
+                { L("Combined"),     3 },
+            };
+            MCAddDropdown(PREF_SELL_COMBO, L("Show sell value on hover"), sellComboOpts, typeof(int), sellComboDefault);
 
             // Change delegate - register only once; on language re-registration this is skipped
             if (!_mcDelegateRegistered)
@@ -2610,17 +2640,50 @@ namespace AllInOneMod_m0n0t0ny
                 catch { }
             }
 
+            // OnConfigSaved fires AFTER ES3 is written - more reliable than per-change delegate
+            if (!_mcSavedRegistered)
+            {
+                try
+                {
+                    _mcAPI.GetMethod("add_OnConfigSaved",
+                            BindingFlags.Public | BindingFlags.Static, null,
+                            new[] { typeof(Action) }, null)
+                        ?.Invoke(null, new object[] { (Action)OnModConfigSaved });
+                    _mcSavedRegistered = true;
+                }
+                catch { }
+            }
+
             _mcChecked = true; // Registration complete - stop retrying until next language change
         }
 
         private void OnModConfigChanged(string key)
         {
             if (_mcAPI == null) return;
+            ApplyModConfigValue(key);
+        }
 
-            if (key == PREF_ENABLED)
-            { _showValue = MCLoadBool(key, _showValue); PlayerPrefs.SetInt(key, _showValue ? 1 : 0); RefreshToggleButton(); }
-            else if (key == PREF_MODE)
-            { _mode = (DisplayMode)MCLoadInt(key, (int)_mode); PlayerPrefs.SetInt(key, (int)_mode); RefreshModeButtons(); }
+        private void ApplyModConfigValue(string key)
+        {
+            if (_mcAPI == null) return;
+
+            if (key == PREF_SELL_COMBO)
+            {
+                int sellComboDefault = !_showValue ? 0 : _mode switch {
+                    DisplayMode.SingleOnly => 1,
+                    DisplayMode.StackOnly  => 2,
+                    _                      => 3,
+                };
+                int v = MCLoadInt(key, sellComboDefault);
+                _showValue = v != 0;
+                if (v == 1) _mode = DisplayMode.SingleOnly;
+                else if (v == 2) _mode = DisplayMode.StackOnly;
+                else if (v == 3) _mode = DisplayMode.Combined;
+                PlayerPrefs.SetInt(PREF_ENABLED, _showValue ? 1 : 0);
+                PlayerPrefs.SetInt(PREF_MODE, (int)_mode);
+                SaveSellComboPrefs();
+                RefreshToggleButton(); RefreshModeButtons();
+            }
             else if (key == PREF_ENEMY_NAMES)
             { _showEnemyNames = MCLoadBool(key, _showEnemyNames); PlayerPrefs.SetInt(key, _showEnemyNames ? 1 : 0); RefreshEnemyNamesToggle(); }
             else if (key == PREF_TRANSFER_COMBO)
@@ -2660,6 +2723,8 @@ namespace AllInOneMod_m0n0t0ny
                 if (!_showFps && _fpsCanvas != null) _fpsCanvas.SetActive(false);
                 else if (_showFps) { EnsureFpsCanvas(); _fpsCanvas!.SetActive(true); }
             }
+            else if (key == PREF_SKIP_MELEE)
+            { _skipMeleeOnScroll = MCLoadBool(key, _skipMeleeOnScroll); PlayerPrefs.SetInt(key, _skipMeleeOnScroll ? 1 : 0); RefreshSkipMeleeToggle(); }
             else if (key == PREF_AUTO_UNLOAD)
             { _autoUnloadEnabled = MCLoadBool(key, _autoUnloadEnabled); PlayerPrefs.SetInt(key, _autoUnloadEnabled ? 1 : 0); RefreshAutoUnloadToggle(); }
             else if (key == PREF_LOOTBOX_HL)
@@ -2703,12 +2768,12 @@ namespace AllInOneMod_m0n0t0ny
 
         private void MCAddBool(string key, string desc, bool def)
         {
-            try
+            var opts = new SortedDictionary<string, object>
             {
-                _mcAPI!.GetMethod("SafeAddBoolDropdownList", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, def });
-            }
-            catch { }
+                { L("Disabled"), 0 },
+                { L("Enabled"),  1 },
+            };
+            MCAddDropdown(key, desc, opts, typeof(int), def ? 1 : 0);
         }
 
         private void MCAddDropdown(string key, string desc, SortedDictionary<string, object> options, Type valueType, object def)
@@ -2733,14 +2798,7 @@ namespace AllInOneMod_m0n0t0ny
 
         private bool MCLoadBool(string key, bool def)
         {
-            try
-            {
-                var result = _mcAPI!.GetMethod("SafeLoad", BindingFlags.Public | BindingFlags.Static)
-                    ?.MakeGenericMethod(typeof(bool))
-                    .Invoke(null, new object[] { MC_MOD_NAME, key, def });
-                return result is bool b ? b : def;
-            }
-            catch { return def; }
+            return MCLoadInt(key, def ? 1 : 0) != 0;
         }
 
         private int MCLoadInt(string key, int def)
@@ -2753,6 +2811,78 @@ namespace AllInOneMod_m0n0t0ny
                 return result is int i ? i : def;
             }
             catch { return def; }
+        }
+
+        private void MCSetInt(string key, int value)
+        {
+            if (_mcAPI == null) return;
+            try
+            {
+                _mcAPI.GetMethod("SafeSave", BindingFlags.Public | BindingFlags.Static)
+                    ?.MakeGenericMethod(typeof(int))
+                    .Invoke(null, new object[] { MC_MOD_NAME, key, value });
+            }
+            catch { }
+        }
+
+        private void SyncAllToModConfig()
+        {
+            if (_mcAPI == null) return;
+            int sellV = !_showValue ? 0 : _mode switch { DisplayMode.SingleOnly => 1, DisplayMode.StackOnly => 2, _ => 3 };
+            MCSetInt(PREF_SELL_COMBO, sellV);
+            MCSetInt(PREF_ENEMY_NAMES, _showEnemyNames ? 1 : 0);
+            int transferV = !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2);
+            MCSetInt(PREF_TRANSFER_COMBO, transferV);
+            MCSetInt(PREF_AC_WASD, _autoCloseOnWASD ? 1 : 0);
+            MCSetInt(PREF_AC_SHIFT, _autoCloseOnShift ? 1 : 0);
+            MCSetInt(PREF_AC_SPACE, _autoCloseOnSpace ? 1 : 0);
+            MCSetInt(PREF_AC_DAMAGE, _autoCloseOnDamage ? 1 : 0);
+            MCSetInt(PREF_SKIP_MELEE, _skipMeleeOnScroll ? 1 : 0);
+            MCSetInt(PREF_AUTO_UNLOAD, _autoUnloadEnabled ? 1 : 0);
+            MCSetInt(PREF_LOOTBOX_HL, _lootboxHLEnabled ? 1 : 0);
+            MCSetInt(PREF_LOOTBOX_HL_UNSEARCHED, _lootboxHLOnlyUnsearched ? 1 : 0);
+            MCSetInt(PREF_KILL_FEED, _killFeedEnabled ? 1 : 0);
+            MCSetInt(PREF_QUEST_FAV, _questFavEnabled ? 1 : 0);
+            MCSetInt(PREF_HIDE_CTRL, _hideCtrlHint ? 1 : 0);
+            MCSetInt(PREF_CAMERA_VIEW, _cameraViewPersist ? 1 : 0);
+            MCSetInt(PREF_SLEEP_ENABLED, _sleepPresetsEnabled ? 1 : 0);
+            MCSetInt(PREF_RECORDER_BADGE, _showRecorderBadge ? 1 : 0);
+            MCSetInt(PREF_FPS_COUNTER, _showFps ? 1 : 0);
+            MCSetInt(PREF_PRESET1H, _preset1Hour); MCSetInt(PREF_PRESET1M, _preset1Min);
+            MCSetInt(PREF_PRESET2H, _preset2Hour); MCSetInt(PREF_PRESET2M, _preset2Min);
+            MCSetInt(PREF_PRESET3H, _preset3Hour); MCSetInt(PREF_PRESET3M, _preset3Min);
+            MCSetInt(PREF_PRESET4H, _preset4Hour); MCSetInt(PREF_PRESET4M, _preset4Min);
+        }
+
+        private void OnModConfigSaved()
+        {
+            // add_OnConfigSaved fires AFTER ES3 is written - call ApplyModConfigValue directly (no frame delay)
+            ApplyModConfigValue(PREF_SELL_COMBO);
+            ApplyModConfigValue(PREF_ENEMY_NAMES);
+            ApplyModConfigValue(PREF_TRANSFER_COMBO);
+            ApplyModConfigValue(PREF_AC_WASD);
+            ApplyModConfigValue(PREF_AC_SHIFT);
+            ApplyModConfigValue(PREF_AC_SPACE);
+            ApplyModConfigValue(PREF_AC_DAMAGE);
+            ApplyModConfigValue(PREF_SKIP_MELEE);
+            ApplyModConfigValue(PREF_AUTO_UNLOAD);
+            ApplyModConfigValue(PREF_LOOTBOX_HL);
+            ApplyModConfigValue(PREF_LOOTBOX_HL_UNSEARCHED);
+            ApplyModConfigValue(PREF_KILL_FEED);
+            ApplyModConfigValue(PREF_QUEST_FAV);
+            ApplyModConfigValue(PREF_HIDE_CTRL);
+            ApplyModConfigValue(PREF_CAMERA_VIEW);
+            ApplyModConfigValue(PREF_SLEEP_ENABLED);
+            ApplyModConfigValue(PREF_RECORDER_BADGE);
+            ApplyModConfigValue(PREF_FPS_COUNTER);
+            ApplyModConfigValue(PREF_PRESET1H);
+            ApplyModConfigValue(PREF_PRESET1M);
+            ApplyModConfigValue(PREF_PRESET2H);
+            ApplyModConfigValue(PREF_PRESET2M);
+            ApplyModConfigValue(PREF_PRESET3H);
+            ApplyModConfigValue(PREF_PRESET3M);
+            ApplyModConfigValue(PREF_PRESET4H);
+            ApplyModConfigValue(PREF_PRESET4M);
         }
 
         // ── Item Hover UI ─────────────────────────────────────────────────
