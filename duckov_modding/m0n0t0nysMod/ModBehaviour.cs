@@ -24,28 +24,28 @@ namespace AllInOneMod_m0n0t0ny
     public class ModBehaviour : Duckov.Modding.ModBehaviour
     {
         // ── PlayerPrefs keys ──────────────────────────────────────────────
-        private const string PREF_ENABLED        = "DisplayItemValue_Enabled";
-        private const string PREF_MODE           = "DisplayItemValue_Mode";
-        private const string PREF_SLEEP_ENABLED  = "DisplayItemValue_SleepEnabled";
-        private const string PREF_PRESET1H       = "DisplayItemValue_Preset1H";
-        private const string PREF_PRESET1M       = "DisplayItemValue_Preset1M";
-        private const string PREF_PRESET2H       = "DisplayItemValue_Preset2H";
-        private const string PREF_PRESET2M       = "DisplayItemValue_Preset2M";
-        private const string PREF_PRESET3H       = "DisplayItemValue_Preset3H";
-        private const string PREF_PRESET3M       = "DisplayItemValue_Preset3M";
-        private const string PREF_PRESET4H       = "DisplayItemValue_Preset4H";
-        private const string PREF_PRESET4M       = "DisplayItemValue_Preset4M";
-        private const string PREF_ENEMY_NAMES       = "DisplayItemValue_EnemyNames";
-        private const string PREF_TRANSFER_ENABLED  = "DisplayItemValue_TransferEnabled";
-        private const string PREF_TRANSFER_MOD      = "DisplayItemValue_TransferMod";
-        private const string PREF_AC_WASD            = "DisplayItemValue_ACWasd";
-        private const string PREF_AC_SHIFT           = "DisplayItemValue_ACShift";
-        private const string PREF_AC_SPACE           = "DisplayItemValue_ACSpace";
-        private const string PREF_AC_DAMAGE          = "DisplayItemValue_ACDamage";
-        private const string PREF_FPS_COUNTER        = "DisplayItemValue_FpsCounter";
-        private const string PREF_SKIP_MELEE         = "DisplayItemValue_SkipMelee";
-        private const KeyCode MENU_KEY               = KeyCode.F9;
-        private const string MC_MOD_NAME             = "All In One - m0n0t0ny's Mod";
+        private const string PREF_ENABLED = "DisplayItemValue_Enabled";
+        private const string PREF_MODE = "DisplayItemValue_Mode";
+        private const string PREF_SLEEP_ENABLED = "DisplayItemValue_SleepEnabled";
+        private const string PREF_PRESET1H = "DisplayItemValue_Preset1H";
+        private const string PREF_PRESET1M = "DisplayItemValue_Preset1M";
+        private const string PREF_PRESET2H = "DisplayItemValue_Preset2H";
+        private const string PREF_PRESET2M = "DisplayItemValue_Preset2M";
+        private const string PREF_PRESET3H = "DisplayItemValue_Preset3H";
+        private const string PREF_PRESET3M = "DisplayItemValue_Preset3M";
+        private const string PREF_PRESET4H = "DisplayItemValue_Preset4H";
+        private const string PREF_PRESET4M = "DisplayItemValue_Preset4M";
+        private const string PREF_ENEMY_NAMES = "DisplayItemValue_EnemyNames";
+        private const string PREF_TRANSFER_ENABLED = "DisplayItemValue_TransferEnabled";
+        private const string PREF_TRANSFER_MOD = "DisplayItemValue_TransferMod";
+        private const string PREF_AC_WASD = "DisplayItemValue_ACWasd";
+        private const string PREF_AC_SHIFT = "DisplayItemValue_ACShift";
+        private const string PREF_AC_SPACE = "DisplayItemValue_ACSpace";
+        private const string PREF_AC_DAMAGE = "DisplayItemValue_ACDamage";
+        private const string PREF_FPS_COUNTER = "DisplayItemValue_FpsCounter";
+        private const string PREF_SKIP_MELEE = "DisplayItemValue_SkipMelee";
+        private const KeyCode MENU_KEY = KeyCode.F9;
+        private const string MC_MOD_NAME = "All In One - m0n0t0ny's Mod";
 
         // ── Item value display ────────────────────────────────────────────
         private bool _showValue;
@@ -83,8 +83,8 @@ namespace AllInOneMod_m0n0t0ny
 
         // ── LootView cache (shared by AutoUnload + AutoClose + Transfer) ──
         private LootView? _cachedLootView;
-        private float     _lootViewCacheTimer; // counts down; refresh when <= 0
-        // Refreshed ONCE per frame in Update() — not per-caller.
+        private float _lootViewCacheTimer; // counts down; refresh when <= 0
+        // Refreshed ONCE per frame in Update() - not per-caller.
 
         // ── Enemy name display ────────────────────────────────────────────
         private bool _showEnemyNames;
@@ -100,7 +100,7 @@ namespace AllInOneMod_m0n0t0ny
 
         // ── Settings panel UI refs ────────────────────────────────────────
         private GameObject? _settingsCanvas;
-        private Canvas?     _settingsCanvasComp;
+        private Canvas? _settingsCanvasComp;
         private Image? _toggleBtnImage;
         private RectTransform? _toggleBtnThumb;
         private Image[]? _modeBtnImages;
@@ -112,10 +112,10 @@ namespace AllInOneMod_m0n0t0ny
 
         // ── Sleep preset state ────────────────────────────────────────────
         private bool _sleepPresetsEnabled;
-        private int  _preset1Hour, _preset1Min;
-        private int  _preset2Hour, _preset2Min;
-        private int  _preset3Hour, _preset3Min;
-        private int  _preset4Hour, _preset4Min;
+        private int _preset1Hour, _preset1Min;
+        private int _preset2Hour, _preset2Min;
+        private int _preset3Hour, _preset3Min;
+        private int _preset4Hour, _preset4Min;
         private SleepView? _sleepViewInstance;
         private bool _sleepPresetsInjected;
         private TextMeshProUGUI? _preset1BtnLabel;
@@ -136,7 +136,7 @@ namespace AllInOneMod_m0n0t0ny
         // ── Skip melee on scroll ──────────────────────────────────────────
         private bool _skipMeleeOnScroll;
         private bool _scrollDetectedThisFrame;
-        private int  _lastScrollDir;
+        private int _lastScrollDir;
         private Image? _skipMeleeToggleImage;
         private RectTransform? _skipMeleeToggleThumb;
         private CharacterMainControl? _playerCtrl;
@@ -148,14 +148,14 @@ namespace AllInOneMod_m0n0t0ny
         private RectTransform? _autoUnloadToggleThumb;
         private int _lastAutoUnloadInvId;
         private static PropertyInfo? _itemPlugsProp;
-        private static FieldInfo?    _itemPlugsField;
-        private static bool          _itemPlugsSearched;
+        private static FieldInfo? _itemPlugsField;
+        private static bool _itemPlugsSearched;
         private static PropertyInfo? _stackCountProp;
-        private static bool          _stackCountSearched;
+        private static bool _stackCountSearched;
 
         // ── ModConfig integration (optional) ─────────────────────────────
-        private static Type?    _mcAPI;
-        private bool            _mcChecked;
+        private static Type? _mcAPI;
+        private bool _mcChecked;
         private Action<string>? _mcDelegate;
 
         // ── Factory Recorder badge ────────────────────────────────────────
@@ -166,14 +166,14 @@ namespace AllInOneMod_m0n0t0ny
         // ItemUtilities.IsRegistered(Item) → bool  (static helper used by the game)
         private static MethodInfo? _isRegisteredMethod;
         // Slot badge overlay tracking
-        private static Type?       _slotCompType;
+        private static Type? _slotCompType;
         private static MemberInfo? _slotItemMember; // PropertyInfo or FieldInfo → Item
         private static readonly Dictionary<Type, MemberInfo?> _typeItemMemberCache = new Dictionary<Type, MemberInfo?>();
         private float _badgeScanTimer;
         private readonly Dictionary<int, GameObject> _slotBadges = new Dictionary<int, GameObject>();
 
         // ── Lootbox Highlight ─────────────────────────────────────────────
-        private const string PREF_LOOTBOX_HL            = "DisplayItemValue_LootboxHL";
+        private const string PREF_LOOTBOX_HL = "DisplayItemValue_LootboxHL";
         private const string PREF_LOOTBOX_HL_UNSEARCHED = "DisplayItemValue_LootboxHLUnsearched";
         private bool _lootboxHLEnabled;
         private bool _lootboxHLOnlyUnsearched;
@@ -185,14 +185,14 @@ namespace AllInOneMod_m0n0t0ny
         private readonly Dictionary<int, Outlinable> _lootboxOutlines = new Dictionary<int, Outlinable>();
         private float _lootboxScanTimer;
         private float _lootboxUpdateTimer;
-        private static Type?      _lbType;              // InteractableLootbox
-        private static Type?      _imType;              // InteractMarker
+        private static Type? _lbType;              // InteractableLootbox
+        private static Type? _imType;              // InteractMarker
         private static FieldInfo? _imMarkedAsUsed;      // InteractMarker.markedAsUsed
         private static FieldInfo? _invInspectedField;   // Inventory.hasBeenInspectedInLootBox
-        private static bool       _lbCached;
+        private static bool _lbCached;
 
         // ── Quest Favorites ───────────────────────────────────────────────
-        private const string PREF_QUEST_FAV     = "DisplayItemValue_QuestFav";
+        private const string PREF_QUEST_FAV = "DisplayItemValue_QuestFav";
         private const string PREF_QUEST_FAV_IDS = "DisplayItemValue_QuestFavIds";
         private bool _questFavEnabled;
         private readonly HashSet<int> _favoriteQuestIds = new HashSet<int>();
@@ -203,24 +203,34 @@ namespace AllInOneMod_m0n0t0ny
             typeof(QuestView).GetField("activeEntries", BindingFlags.NonPublic | BindingFlags.Instance);
 
         // ── Kill Feed ─────────────────────────────────────────────────────
-        private const string PREF_KILL_FEED   = "DisplayItemValue_KillFeed";
-        private const string PREF_HIDE_CTRL  = "DisplayItemValue_HideCtrlHint";
+        private const string PREF_KILL_FEED = "DisplayItemValue_KillFeed";
+        private const string PREF_HIDE_CTRL = "DisplayItemValue_HideCtrlHint";
+        private const string PREF_CAMERA_VIEW = "DisplayItemValue_CameraView";
         private bool _killFeedEnabled;
         private Image? _killFeedToggleImage;
         private RectTransform? _killFeedToggleThumb;
         private bool _hideCtrlHint;
         private Image? _hideCtrlToggleImage;
         private RectTransform? _hideCtrlToggleThumb;
+        private bool _cameraViewPersist;
+        private Image? _cameraViewToggleImage;
+        private RectTransform? _cameraViewToggleThumb;
+        private bool _savedTopDown;
+        private bool _viewRestorePending;
+        private static readonly FieldInfo? _topDownViewField =
+            typeof(CameraArm).GetField("topDownView", BindingFlags.NonPublic | BindingFlags.Static);
+        private static bool CameraArmGetTopDown() =>
+            _topDownViewField != null && (bool)(_topDownViewField.GetValue(null) ?? false);
         private GameObject? _killFeedCanvas;
         private GameObject? _killFeedContainer;
         private readonly List<KfEntry> _kfEntries = new List<KfEntry>();
-        private const int   KF_MAX     = 5;
+        private const int KF_MAX = 5;
         private const float KF_DISPLAY = 5f;
-        private const float KF_FADE    = 0.5f;
+        private const float KF_FADE = 0.5f;
 
         private sealed class KfEntry
         {
-            public readonly GameObject  Go;
+            public readonly GameObject Go;
             public readonly CanvasGroup Group;
             public float Timer;
             public KfEntry(GameObject go, CanvasGroup group, float timer)
@@ -239,33 +249,35 @@ namespace AllInOneMod_m0n0t0ny
 
         void Awake()
         {
-            _showValue           = PlayerPrefs.GetInt(PREF_ENABLED,      1) == 1;
-            _mode                = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
-            _showEnemyNames      = PlayerPrefs.GetInt(PREF_ENEMY_NAMES,      1) == 1;
-            _transferEnabled     = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
-            _transferModifier    = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
-            _autoCloseOnWASD     = PlayerPrefs.GetInt(PREF_AC_WASD,   0) == 1;
-            _autoCloseOnShift    = PlayerPrefs.GetInt(PREF_AC_SHIFT,  0) == 1;
-            _autoCloseOnSpace    = PlayerPrefs.GetInt(PREF_AC_SPACE,  0) == 1;
-            _autoCloseOnDamage   = PlayerPrefs.GetInt(PREF_AC_DAMAGE, 0) == 1;
+            _showValue = PlayerPrefs.GetInt(PREF_ENABLED, 1) == 1;
+            _mode = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
+            _showEnemyNames = PlayerPrefs.GetInt(PREF_ENEMY_NAMES, 1) == 1;
+            _transferEnabled = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
+            _transferModifier = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
+            _autoCloseOnWASD = PlayerPrefs.GetInt(PREF_AC_WASD, 0) == 1;
+            _autoCloseOnShift = PlayerPrefs.GetInt(PREF_AC_SHIFT, 0) == 1;
+            _autoCloseOnSpace = PlayerPrefs.GetInt(PREF_AC_SPACE, 0) == 1;
+            _autoCloseOnDamage = PlayerPrefs.GetInt(PREF_AC_DAMAGE, 0) == 1;
             _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1) == 1;
-            _preset1Hour         = PlayerPrefs.GetInt(PREF_PRESET1H,  5);
-            _preset1Min          = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
-            _preset2Hour         = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
-            _preset2Min          = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
-            _preset3Hour         = PlayerPrefs.GetInt(PREF_PRESET3H,  8);
-            _preset3Min          = PlayerPrefs.GetInt(PREF_PRESET3M,  0);
-            _preset4Hour         = PlayerPrefs.GetInt(PREF_PRESET4H, 12);
-            _preset4Min          = PlayerPrefs.GetInt(PREF_PRESET4M,  0);
-            _showRecorderBadge   = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
-            _showFps             = PlayerPrefs.GetInt(PREF_FPS_COUNTER,    0) == 1;
-            _skipMeleeOnScroll   = PlayerPrefs.GetInt(PREF_SKIP_MELEE,     1) == 1;
-            _autoUnloadEnabled       = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD,         1) == 1;
-            _lootboxHLEnabled        = PlayerPrefs.GetInt(PREF_LOOTBOX_HL,          1) == 1;
+            _preset1Hour = PlayerPrefs.GetInt(PREF_PRESET1H, 5);
+            _preset1Min = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
+            _preset2Hour = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
+            _preset2Min = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
+            _preset3Hour = PlayerPrefs.GetInt(PREF_PRESET3H, 8);
+            _preset3Min = PlayerPrefs.GetInt(PREF_PRESET3M, 0);
+            _preset4Hour = PlayerPrefs.GetInt(PREF_PRESET4H, 12);
+            _preset4Min = PlayerPrefs.GetInt(PREF_PRESET4M, 0);
+            _showRecorderBadge = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
+            _showFps = PlayerPrefs.GetInt(PREF_FPS_COUNTER, 0) == 1;
+            _skipMeleeOnScroll = PlayerPrefs.GetInt(PREF_SKIP_MELEE, 1) == 1;
+            _autoUnloadEnabled = PlayerPrefs.GetInt(PREF_AUTO_UNLOAD, 1) == 1;
+            _lootboxHLEnabled = PlayerPrefs.GetInt(PREF_LOOTBOX_HL, 1) == 1;
             _lootboxHLOnlyUnsearched = PlayerPrefs.GetInt(PREF_LOOTBOX_HL_UNSEARCHED, 0) == 1;
-            _killFeedEnabled         = PlayerPrefs.GetInt(PREF_KILL_FEED,             1) == 1;
-            _hideCtrlHint            = PlayerPrefs.GetInt(PREF_HIDE_CTRL,             1) == 1;
-            _questFavEnabled         = PlayerPrefs.GetInt(PREF_QUEST_FAV,             1) == 1;
+            _killFeedEnabled = PlayerPrefs.GetInt(PREF_KILL_FEED, 1) == 1;
+            _hideCtrlHint = PlayerPrefs.GetInt(PREF_HIDE_CTRL, 1) == 1;
+            _cameraViewPersist = PlayerPrefs.GetInt(PREF_CAMERA_VIEW, 1) == 1;
+            _savedTopDown = PlayerPrefs.GetInt("CameraViewSavedTopDown", 0) == 1;
+            _questFavEnabled = PlayerPrefs.GetInt(PREF_QUEST_FAV, 1) == 1;
             foreach (var s in PlayerPrefs.GetString(PREF_QUEST_FAV_IDS, "").Split(','))
                 if (int.TryParse(s.Trim(), out int qid) && qid != 0) _favoriteQuestIds.Add(qid);
             CacheRecorderReflection();
@@ -275,8 +287,8 @@ namespace AllInOneMod_m0n0t0ny
         }
 
         private CursorLockMode _prevLockMode;
-        private bool           _prevCursorVisible;
-        private bool           _menuOpen;
+        private bool _prevCursorVisible;
+        private bool _menuOpen;
         private static readonly Type? _inputControlType =
             AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
@@ -291,10 +303,10 @@ namespace AllInOneMod_m0n0t0ny
 
             if (open)
             {
-                _prevLockMode      = Cursor.lockState;
+                _prevLockMode = Cursor.lockState;
                 _prevCursorVisible = Cursor.visible;
-                Cursor.lockState   = CursorLockMode.None;
-                Cursor.visible     = true;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
 
                 _disabledInputControls.Clear();
                 if (_inputControlType != null)
@@ -312,7 +324,7 @@ namespace AllInOneMod_m0n0t0ny
             else
             {
                 Cursor.lockState = _prevLockMode;
-                Cursor.visible   = _prevCursorVisible;
+                Cursor.visible = _prevCursorVisible;
 
                 foreach (var b in _disabledInputControls)
                     if (b != null) b.enabled = true;
@@ -352,7 +364,7 @@ namespace AllInOneMod_m0n0t0ny
             _fpsCanvas = new GameObject("FpsCounter");
             DontDestroyOnLoad(_fpsCanvas);
             var canvas = _fpsCanvas.AddComponent<Canvas>();
-            canvas.renderMode  = RenderMode.ScreenSpaceOverlay;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 100;
             _fpsCanvas.AddComponent<CanvasScaler>();
             _fpsCanvas.AddComponent<GraphicRaycaster>();
@@ -360,20 +372,20 @@ namespace AllInOneMod_m0n0t0ny
             var go = new GameObject("FpsText");
             go.transform.SetParent(_fpsCanvas.transform, false);
             _fpsTMP = go.AddComponent<TextMeshProUGUI>();
-            _fpsTMP.fontSize  = 14f;
-            _fpsTMP.color     = Color.white;
+            _fpsTMP.fontSize = 14f;
+            _fpsTMP.color = Color.white;
             _fpsTMP.fontStyle = FontStyles.Bold;
             _fpsTMP.alignment = TextAlignmentOptions.TopRight;
             var rt = go.GetComponent<RectTransform>();
-            rt.anchorMin        = new Vector2(1f, 1f);
-            rt.anchorMax        = new Vector2(1f, 1f);
-            rt.pivot            = new Vector2(1f, 1f);
+            rt.anchorMin = new Vector2(1f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
             rt.anchoredPosition = new Vector2(-42f, -10f);
-            rt.sizeDelta        = new Vector2(100f, 30f);
+            rt.sizeDelta = new Vector2(100f, 30f);
 
             // Shadow for readability
             var shadow = go.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor    = new Color(0f, 0f, 0f, 0.8f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.8f);
             shadow.effectDistance = new Vector2(1f, -1f);
         }
 
@@ -381,16 +393,16 @@ namespace AllInOneMod_m0n0t0ny
         {
             ItemHoveringUI.onSetupItem += OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta += OnSetupMeta;
-            SceneManager.sceneLoaded   += OnSceneLoaded;
-            Health.OnDead              += OnKillFeedDeadDirect;
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            Health.OnDead += OnKillFeedDeadDirect;
         }
 
         void OnDisable()
         {
             ItemHoveringUI.onSetupItem -= OnSetupItemHoveringUI;
             ItemHoveringUI.onSetupMeta -= OnSetupMeta;
-            SceneManager.sceneLoaded   -= OnSceneLoaded;
-            Health.OnDead              -= OnKillFeedDeadDirect;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            Health.OnDead -= OnKillFeedDeadDirect;
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -399,6 +411,7 @@ namespace AllInOneMod_m0n0t0ny
             ClearKillFeedSubscriptions();
             _simpleIndicators = null;
             _simpleIndicatorsFound = false;
+            _viewRestorePending = true;
         }
 
         private Transform? _simpleIndicators;
@@ -421,6 +434,24 @@ namespace AllInOneMod_m0n0t0ny
             // Keep enforcing: if hide is on and the game re-enabled it, hide it again
             if (_hideCtrlHint && _simpleIndicators && _simpleIndicators.gameObject.activeSelf)
                 _simpleIndicators.gameObject.SetActive(false);
+
+            // Camera view: restore saved preference on scene load, then track changes
+            if (_cameraViewPersist && LevelManager.Instance != null)
+            {
+                bool curTopDown = CameraArmGetTopDown();
+                if (_viewRestorePending)
+                {
+                    _viewRestorePending = false;
+                    if (curTopDown != _savedTopDown)
+                        CameraArm.ToggleView();
+                }
+                else if (curTopDown != _savedTopDown)
+                {
+                    _savedTopDown = curTopDown;
+                    PlayerPrefs.SetInt("CameraViewSavedTopDown", _savedTopDown ? 1 : 0);
+                    PlayerPrefs.Save();
+                }
+            }
 
             // If the game externally hides our canvas (SetActive or Canvas.enabled), restore it
             if (_menuOpen && _settingsCanvas != null)
@@ -468,8 +499,8 @@ namespace AllInOneMod_m0n0t0ny
             if (_transferEnabled && Input.GetMouseButtonDown(0))
             {
                 bool shift = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-                bool alt   = Input.GetKey(KeyCode.LeftAlt)   || Input.GetKey(KeyCode.RightAlt);
-                bool mod   = _transferModifier == TransferModifier.Shift ? shift : alt;
+                bool alt = Input.GetKey(KeyCode.LeftAlt) || Input.GetKey(KeyCode.RightAlt);
+                bool mod = _transferModifier == TransferModifier.Shift ? shift : alt;
                 if (mod) TryShiftClickTransfer();
             }
 
@@ -483,7 +514,7 @@ namespace AllInOneMod_m0n0t0ny
                 }
             }
 
-            // Resolve active LootView ONCE per frame — shared by AutoClose + AutoUnload.
+            // Resolve active LootView ONCE per frame - shared by AutoClose + AutoUnload.
             // FindObjectOfType is throttled to max once every 0.2s via _lootViewCacheTimer.
             LootView? activeLootView = null;
             bool needsLootView = (_autoCloseOnWASD || _autoCloseOnShift || _autoCloseOnSpace || _autoCloseOnDamage) || _autoUnloadEnabled;
@@ -527,7 +558,7 @@ namespace AllInOneMod_m0n0t0ny
                 _fpsFrameCount++;
                 if (_fpsDeltaAccum >= 0.5f)
                 {
-                    _fpsValue      = _fpsFrameCount / _fpsDeltaAccum;
+                    _fpsValue = _fpsFrameCount / _fpsDeltaAccum;
                     _fpsDeltaAccum = 0f;
                     _fpsFrameCount = 0;
                     EnsureFpsCanvas();
@@ -543,7 +574,7 @@ namespace AllInOneMod_m0n0t0ny
             // stable value even if EventSystem clears the hover mid-frame.
             _transferCachedItem = _lastHoveredItem;
 
-            // Skip melee during scroll — the game has already switched weapons by LateUpdate,
+            // Skip melee during scroll - the game has already switched weapons by LateUpdate,
             // so if we ended up on melee we call SwitchWeapon once more to skip past it.
             if (_skipMeleeOnScroll && _scrollDetectedThisFrame)
             {
@@ -587,7 +618,7 @@ namespace AllInOneMod_m0n0t0ny
         }
 
         // ── Auto-unload enemy weapons ─────────────────────────────────────
-        // Triggered when the player opens loot on an enemy — zero polling overhead.
+        // Triggered when the player opens loot on an enemy - zero polling overhead.
         // Scans items in the loot inventory and detaches any plugged sub-items
         // (ammo, magazines) directly into that same inventory.
 
@@ -835,7 +866,7 @@ namespace AllInOneMod_m0n0t0ny
                 try { Destroy(ol); } catch { }
             }
             _lootboxOutlines.Clear();
-            _lootboxScanTimer  = 0f;
+            _lootboxScanTimer = 0f;
             _lootboxUpdateTimer = 0f;
         }
 
@@ -846,9 +877,9 @@ namespace AllInOneMod_m0n0t0ny
             var lv = (_cachedLootView != null && _cachedLootView.gameObject.activeInHierarchy) ? _cachedLootView : null;
             bool lvActive = lv != null;
             var item = _transferCachedItem ?? _lastHoveredItem;
-if (!lvActive || item == null) return;
+            if (!lvActive || item == null) return;
 
-            var charInvDisplay = _lootCharInvField?.GetValue(lv)  as InventoryDisplay;
+            var charInvDisplay = _lootCharInvField?.GetValue(lv) as InventoryDisplay;
             var lootInvDisplay = _lootTargetInvField?.GetValue(lv) as InventoryDisplay;
             var charInv = _invDisplayTargetProp?.GetValue(charInvDisplay) as Inventory;
             var lootInv = _invDisplayTargetProp?.GetValue(lootInvDisplay) as Inventory;
@@ -912,9 +943,9 @@ if (!lvActive || item == null) return;
                     var prop = t.GetProperty("Current", BindingFlags.Public | BindingFlags.Instance);
                     if (prop?.PropertyType == typeof(float))
                     {
-                        _playerHealthComp     = comp;
+                        _playerHealthComp = comp;
                         _playerHealthValueProp = prop;
-                        _playerHealthPrev      = (float)prop.GetValue(comp)!;
+                        _playerHealthPrev = (float)prop.GetValue(comp)!;
                         return;
                     }
                 }
@@ -935,12 +966,12 @@ if (!lvActive || item == null) return;
 
             if (sv != _sleepViewInstance)
             {
-                _sleepViewInstance    = sv;
+                _sleepViewInstance = sv;
                 _sleepPresetsInjected = false;
-                _preset1BtnLabel      = null;
-                _preset2BtnLabel      = null;
-                _preset3BtnLabel      = null;
-                _preset4BtnLabel      = null;
+                _preset1BtnLabel = null;
+                _preset2BtnLabel = null;
+                _preset3BtnLabel = null;
+                _preset4BtnLabel = null;
             }
 
             if (!_sleepPresetsInjected && sv.gameObject.activeInHierarchy)
@@ -973,46 +1004,46 @@ if (!lvActive || item == null) return;
                 return;
             }
 
-            var sleepRect  = sleepBtn.GetComponent<RectTransform>();
+            var sleepRect = sleepBtn.GetComponent<RectTransform>();
             var origParent = sleepRect.parent;
-            var origAnchorMin   = sleepRect.anchorMin;
-            var origAnchorMax   = sleepRect.anchorMax;
-            var origPivot       = sleepRect.pivot;
-            var origSizeDelta   = sleepRect.sizeDelta;
+            var origAnchorMin = sleepRect.anchorMin;
+            var origAnchorMax = sleepRect.anchorMax;
+            var origPivot = sleepRect.pivot;
+            var origSizeDelta = sleepRect.sizeDelta;
             var origAnchoredPos = sleepRect.anchoredPosition;
-            int origSiblingIdx  = sleepBtn.transform.GetSiblingIndex();
+            int origSiblingIdx = sleepBtn.transform.GetSiblingIndex();
 
             var wrapper = new GameObject("SleepPresetWrapper");
             wrapper.transform.SetParent(origParent, false);
             wrapper.transform.SetSiblingIndex(origSiblingIdx);
             var wrapperRect = wrapper.AddComponent<RectTransform>();
-            wrapperRect.anchorMin        = origAnchorMin;
-            wrapperRect.anchorMax        = origAnchorMax;
-            wrapperRect.pivot            = origPivot;
-            wrapperRect.sizeDelta        = origSizeDelta;
+            wrapperRect.anchorMin = origAnchorMin;
+            wrapperRect.anchorMax = origAnchorMax;
+            wrapperRect.pivot = origPivot;
+            wrapperRect.sizeDelta = origSizeDelta;
             wrapperRect.anchoredPosition = origAnchoredPos;
 
             var hLayout = wrapper.AddComponent<HorizontalLayoutGroup>();
-            hLayout.spacing               = 6f;
-            hLayout.childAlignment        = TextAnchor.MiddleCenter;
-            hLayout.childForceExpandWidth  = false;
+            hLayout.spacing = 6f;
+            hLayout.childAlignment = TextAnchor.MiddleCenter;
+            hLayout.childForceExpandWidth = false;
             hLayout.childForceExpandHeight = true;
-            hLayout.padding               = new RectOffset(0, 0, 0, 0);
+            hLayout.padding = new RectOffset(0, 0, 0, 0);
 
             sleepBtn.transform.SetParent(wrapper.transform, false);
             var sleepLE = sleepBtn.gameObject.GetComponent<LayoutElement>();
             if (sleepLE == null) sleepLE = sleepBtn.gameObject.AddComponent<LayoutElement>();
             sleepLE.preferredWidth = origSizeDelta.x * 0.32f;
-            sleepLE.flexibleWidth  = 0f;
+            sleepLE.flexibleWidth = 0f;
 
             var presetGrid = new GameObject("PresetGrid");
             presetGrid.transform.SetParent(wrapper.transform, false);
             var gridLE = presetGrid.AddComponent<LayoutElement>();
             gridLE.flexibleWidth = 1f;
             var vLayout = presetGrid.AddComponent<VerticalLayoutGroup>();
-            vLayout.spacing               = 4f;
-            vLayout.childAlignment        = TextAnchor.MiddleCenter;
-            vLayout.childForceExpandWidth  = true;
+            vLayout.spacing = 4f;
+            vLayout.childAlignment = TextAnchor.MiddleCenter;
+            vLayout.childForceExpandWidth = true;
             vLayout.childForceExpandHeight = true;
 
             var row1 = MakePresetRow(presetGrid);
@@ -1022,9 +1053,9 @@ if (!lvActive || item == null) return;
             _preset4BtnLabel = AddGridBtn(row1, sv, $"{_preset4Hour:D2}:{_preset4Min:D2}", () => MinutesUntilTime(_preset4Hour, _preset4Min), sleepBtn);
 
             var row2 = MakePresetRow(presetGrid);
-            AddGridBtn(row2, sv, "Rain",       () => MinutesUntilRain(),     sleepBtn);
-            AddGridBtn(row2, sv, "Storm I",    () => MinutesUntilStorm(1),   sleepBtn);
-            AddGridBtn(row2, sv, "Storm II",   () => MinutesUntilStorm(2),   sleepBtn);
+            AddGridBtn(row2, sv, "Rain", () => MinutesUntilRain(), sleepBtn);
+            AddGridBtn(row2, sv, "Storm I", () => MinutesUntilStorm(1), sleepBtn);
+            AddGridBtn(row2, sv, "Storm II", () => MinutesUntilStorm(2), sleepBtn);
             AddGridBtn(row2, sv, "Post-Storm", () => MinutesUntilStormEnd(), sleepBtn);
         }
 
@@ -1033,9 +1064,9 @@ if (!lvActive || item == null) return;
             var row = new GameObject("Row");
             row.transform.SetParent(parent.transform, false);
             var h = row.AddComponent<HorizontalLayoutGroup>();
-            h.spacing               = 4f;
-            h.childAlignment        = TextAnchor.MiddleCenter;
-            h.childForceExpandWidth  = true;
+            h.spacing = 4f;
+            h.childAlignment = TextAnchor.MiddleCenter;
+            h.childForceExpandWidth = true;
             h.childForceExpandHeight = true;
             return row;
         }
@@ -1077,11 +1108,11 @@ if (!lvActive || item == null) return;
                     foreach (var mb in tmp.gameObject.GetComponents<MonoBehaviour>())
                         if (mb != null && mb.GetType().Name.IndexOf("Localiz", System.StringComparison.OrdinalIgnoreCase) >= 0)
                             mb.enabled = false;
-                    tmp.text               = label;
+                    tmp.text = label;
                     tmp.enableWordWrapping = false;
-                    tmp.enableAutoSizing   = true;
-                    tmp.fontSizeMin        = 6f;
-                    tmp.fontSizeMax        = 20f;
+                    tmp.enableAutoSizing = true;
+                    tmp.fontSizeMin = 6f;
+                    tmp.fontSizeMax = 20f;
                 }
             }
             else
@@ -1090,8 +1121,8 @@ if (!lvActive || item == null) return;
                 go.transform.SetParent(row.transform, false);
                 var img2 = go.AddComponent<Image>();
                 img2.sprite = GetOrCreateRoundedRectSprite();
-                img2.type   = Image.Type.Sliced;
-                img2.color  = Color.white;
+                img2.type = Image.Type.Sliced;
+                img2.color = Color.white;
                 btn = go.AddComponent<Button>();
                 btn.targetGraphic = img2;
                 var txtGo2 = new GameObject("T");
@@ -1124,9 +1155,9 @@ if (!lvActive || item == null) return;
 
         private static float? MinutesUntilTime(int hour, int minute)
         {
-            var now    = GameClock.TimeOfDay;
+            var now = GameClock.TimeOfDay;
             var target = new TimeSpan(hour, minute, 0);
-            var diff   = target - now;
+            var diff = target - now;
             if (diff.TotalMinutes <= 0) diff += TimeSpan.FromHours(24);
             return (float)diff.TotalMinutes;
         }
@@ -1173,8 +1204,8 @@ if (!lvActive || item == null) return;
                 if (_isRegisteredMethod != null) break;
                 var fn = asm.FullName ?? "";
                 if (fn.StartsWith("UnityEngine") || fn.StartsWith("System") ||
-                    fn.StartsWith("Mono")        || fn.StartsWith("mscorlib") ||
-                    fn.StartsWith("TMPro")       || fn.StartsWith("Unity.")) continue;
+                    fn.StartsWith("Mono") || fn.StartsWith("mscorlib") ||
+                    fn.StartsWith("TMPro") || fn.StartsWith("Unity.")) continue;
                 Type[]? types = null;
                 try { types = asm.GetTypes(); } catch { continue; }
                 foreach (var t in types)
@@ -1229,11 +1260,11 @@ if (!lvActive || item == null) return;
         private static Item? ReadItemFromMember(MemberInfo member, object obj)
         {
             if (member is PropertyInfo pi) return pi.GetValue(obj) as Item;
-            if (member is FieldInfo   fi) return fi.GetValue(obj) as Item;
+            if (member is FieldInfo fi) return fi.GetValue(obj) as Item;
             return null;
         }
 
-        // Called from OnSetupItemHoveringUI — finds the slot by matching the exact Item instance.
+        // Called from OnSetupItemHoveringUI - finds the slot by matching the exact Item instance.
         private static void TryCacheSlotTypeFromHover(Item item)
         {
             var es = EventSystem.current;
@@ -1276,7 +1307,7 @@ if (!lvActive || item == null) return;
             {
                 // Fast path: scan only instances of the known slot type
                 var slots = FindObjectsOfType(_slotCompType);
-                var seen  = new HashSet<int>();
+                var seen = new HashSet<int>();
 
                 foreach (var obj in slots)
                 {
@@ -1286,7 +1317,7 @@ if (!lvActive || item == null) return;
                     int id = mb.GetInstanceID();
                     seen.Add(id);
 
-                    var item      = ReadItemFromMember(_slotItemMember!, mb);
+                    var item = ReadItemFromMember(_slotItemMember!, mb);
                     bool showBadge = item != null && IsRecipeRecorded(item);
 
                     if (!_slotBadges.TryGetValue(id, out var badge))
@@ -1326,20 +1357,20 @@ if (!lvActive || item == null) return;
                 if (mb.GetType() == GetType()) continue; // skip self
 
                 var compType = mb.GetType();
-                int id       = mb.GetInstanceID();
+                int id = mb.GetInstanceID();
 
                 if (mb is ItemHoveringUI) continue; // skip tooltip UI
-                // Skip HUD/action-bar/button components — not inventory slots
+                // Skip HUD/action-bar/button components - not inventory slots
                 var tn = compType.Name;
-                if (tn.Contains("HUD")    || tn.Contains("Status") || tn.Contains("Stamina") ||
-                    tn.Contains("Health") || tn.Contains("Energy")  || tn.Contains("Equip")  ||
-                    tn.Contains("Button") || tn.Contains("Weapon")  || tn.Contains("Action")) continue;
+                if (tn.Contains("HUD") || tn.Contains("Status") || tn.Contains("Stamina") ||
+                    tn.Contains("Health") || tn.Contains("Energy") || tn.Contains("Equip") ||
+                    tn.Contains("Button") || tn.Contains("Weapon") || tn.Contains("Action")) continue;
 
                 var member = FindItemMember(compType);
                 if (member == null) continue;
 
                 Item? item;
-                try   { item = ReadItemFromMember(member, mb); }
+                try { item = ReadItemFromMember(member, mb); }
                 catch { continue; }
 
                 if (item == null) continue; // skip empty slots
@@ -1347,7 +1378,7 @@ if (!lvActive || item == null) return;
                 // Discover slot type from any slot holding any item (not just registered ones)
                 if (_slotCompType == null)
                 {
-                    _slotCompType   = compType;
+                    _slotCompType = compType;
                     _slotItemMember = member;
                 }
 
@@ -1384,23 +1415,23 @@ if (!lvActive || item == null) return;
             var badge = new GameObject("RecorderBadge");
             badge.transform.SetParent(slot.transform, false);
             var rt = badge.AddComponent<RectTransform>();
-            rt.anchorMin        = new Vector2(1f, 1f);
-            rt.anchorMax        = new Vector2(1f, 1f);
-            rt.pivot            = new Vector2(1f, 1f);
+            rt.anchorMin = new Vector2(1f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
             rt.anchoredPosition = new Vector2(-5f, -5f);
-            rt.sizeDelta        = new Vector2(28f, 28f);
+            rt.sizeDelta = new Vector2(28f, 28f);
 
             var circleImg = badge.AddComponent<Image>();
-            circleImg.color  = new Color(0.13f, 0.65f, 0.28f, 1f);
+            circleImg.color = new Color(0.13f, 0.65f, 0.28f, 1f);
             circleImg.sprite = GetOrCreateCircleSprite();
-            circleImg.type   = Image.Type.Simple;
+            circleImg.type = Image.Type.Simple;
 
             var txtGo = new GameObject("Check");
             txtGo.transform.SetParent(badge.transform, false);
             var tmp = txtGo.AddComponent<TextMeshProUGUI>();
-            tmp.text      = "✓";
-            tmp.fontSize  = 18f;
-            tmp.color     = Color.white;
+            tmp.text = "✓";
+            tmp.fontSize = 18f;
+            tmp.color = Color.white;
             tmp.alignment = TextAlignmentOptions.Center;
             tmp.fontStyle = FontStyles.Bold;
             var tr = txtGo.GetComponent<RectTransform>();
@@ -1429,7 +1460,7 @@ if (!lvActive || item == null) return;
             return _circleSprite;
         }
 
-        // Rounded rect sprite for cards — 9-sliced so it stretches cleanly
+        // Rounded rect sprite for cards - 9-sliced so it stretches cleanly
         private static Sprite? _roundedRectSprite;
         private static Sprite GetOrCreateRoundedRectSprite()
         {
@@ -1452,7 +1483,7 @@ if (!lvActive || item == null) return;
             return _roundedRectSprite;
         }
 
-        // Pill sprite for toggle track — 192×96 with r=48 (= h/2), 9-sliced
+        // Pill sprite for toggle track - 192×96 with r=48 (= h/2), 9-sliced
         // Borders 48+48=96 == target height 96 → zero vertical distortion
         private static Sprite? _pillSprite;
         private static Sprite GetOrCreatePillSprite()
@@ -1484,12 +1515,12 @@ if (!lvActive || item == null) return;
             DontDestroyOnLoad(_settingsCanvas);
             var canvas = _settingsCanvas.AddComponent<Canvas>();
             _settingsCanvasComp = canvas;
-            canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 32767;
             _settingsCanvas.AddComponent<CanvasScaler>();
             _settingsCanvas.AddComponent<GraphicRaycaster>();
 
-            // Panel — rounded outer container, auto-sizes vertically, 800px wide, centered
+            // Panel - rounded outer container, auto-sizes vertically, 800px wide, centered
             var panel = new GameObject("Panel");
             panel.transform.SetParent(_settingsCanvas.transform, false);
             var panelRect = panel.AddComponent<RectTransform>();
@@ -1498,13 +1529,13 @@ if (!lvActive || item == null) return;
             panelRect.sizeDelta = new Vector2(800f, 0f);
             var panelImg = panel.AddComponent<Image>();
             panelImg.sprite = GetOrCreateRoundedRectSprite();
-            panelImg.type   = Image.Type.Sliced;
-            panelImg.color  = new Color(0.047f, 0.047f, 0.055f, 0.98f);
+            panelImg.type = Image.Type.Sliced;
+            panelImg.color = new Color(0.047f, 0.047f, 0.055f, 0.98f);
             var panelMask = panel.AddComponent<Mask>();
             panelMask.showMaskGraphic = true;
             var panelVLG = panel.AddComponent<VerticalLayoutGroup>();
-            panelVLG.childAlignment       = TextAnchor.UpperCenter;
-            panelVLG.childForceExpandWidth  = true;
+            panelVLG.childAlignment = TextAnchor.UpperCenter;
+            panelVLG.childForceExpandWidth = true;
             panelVLG.childForceExpandHeight = false;
             panelVLG.spacing = 0f;
             panelVLG.padding = new RectOffset(0, 0, 0, 0);
@@ -1514,17 +1545,17 @@ if (!lvActive || item == null) return;
             var header = LChild(panel, "Header", 54f);
             header.GetComponent<Image>().color = new Color(0.060f, 0.060f, 0.072f, 1f);
             var hHLG = header.AddComponent<HorizontalLayoutGroup>();
-            hHLG.padding              = new RectOffset(16, 16, 0, 0);
-            hHLG.childAlignment       = TextAnchor.MiddleLeft;
+            hHLG.padding = new RectOffset(16, 16, 0, 0);
+            hHLG.childAlignment = TextAnchor.MiddleLeft;
             hHLG.childForceExpandHeight = true;
-            hHLG.childForceExpandWidth  = false;
+            hHLG.childForceExpandWidth = false;
             hHLG.spacing = 0f;
             var titleGo = LText(header, "Title", "All In One - m0n0t0ny's Mod", 15f, flexW: 1f);
             var titleTMP = titleGo.GetComponent<TextMeshProUGUI>();
             titleTMP.color = Color.white;
             titleTMP.fontStyle = FontStyles.Bold;
             titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.5", 10f, prefW: 44f);
+            var verGo = LText(header, "Ver", "v2.6", 10f, prefW: 44f);
             verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
             verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
 
@@ -1532,15 +1563,15 @@ if (!lvActive || item == null) return;
             var accent = LChild(panel, "Accent", 2f);
             accent.GetComponent<Image>().color = new Color(1f, 0.75f, 0f, 1f);
 
-            // ── Cards box — equal 16px padding on all four sides ─────────
+            // ── Cards box - equal 16px padding on all four sides ─────────
             var cardsBox = new GameObject("CardsBox");
             cardsBox.transform.SetParent(panel.transform, false);
             cardsBox.AddComponent<RectTransform>();
             cardsBox.AddComponent<Image>().color = Color.clear;
             var cbVLG = cardsBox.AddComponent<VerticalLayoutGroup>();
-            cbVLG.padding              = new RectOffset(16, 16, 16, 16);
-            cbVLG.spacing              = 0f;
-            cbVLG.childForceExpandWidth  = true;
+            cbVLG.padding = new RectOffset(16, 16, 16, 16);
+            cbVLG.spacing = 0f;
+            cbVLG.childForceExpandWidth = true;
             cbVLG.childForceExpandHeight = false;
             cardsBox.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
@@ -1550,10 +1581,10 @@ if (!lvActive || item == null) return;
             content.AddComponent<RectTransform>();
             content.AddComponent<Image>().color = Color.clear;
             var cHLG = content.AddComponent<HorizontalLayoutGroup>();
-            cHLG.padding              = new RectOffset(0, 0, 0, 0);
-            cHLG.spacing              = 12f;
-            cHLG.childAlignment       = TextAnchor.UpperLeft;
-            cHLG.childForceExpandWidth  = true;
+            cHLG.padding = new RectOffset(0, 0, 0, 0);
+            cHLG.spacing = 12f;
+            cHLG.childAlignment = TextAnchor.UpperLeft;
+            cHLG.childForceExpandWidth = true;
             cHLG.childForceExpandHeight = false;
             content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
@@ -1576,8 +1607,8 @@ if (!lvActive || item == null) return;
             var modeRow = LChild(c1v, "ModeRow", 30f);
             modeRow.GetComponent<Image>().color = Color.clear;
             var mHLG = modeRow.AddComponent<HorizontalLayoutGroup>();
-            mHLG.spacing               = 6f;
-            mHLG.childForceExpandWidth  = true;
+            mHLG.spacing = 6f;
+            mHLG.childForceExpandWidth = true;
             mHLG.childForceExpandHeight = true;
 
             var (btnS, imgS, lblS) = LModeBtn(modeRow, "Single");
@@ -1629,8 +1660,8 @@ if (!lvActive || item == null) return;
             var modRow = LChild(c1t, "ModRow", 30f);
             modRow.GetComponent<Image>().color = Color.clear;
             var modHLG = modRow.AddComponent<HorizontalLayoutGroup>();
-            modHLG.spacing               = 6f;
-            modHLG.childForceExpandWidth  = true;
+            modHLG.spacing = 6f;
+            modHLG.childForceExpandWidth = true;
             modHLG.childForceExpandHeight = true;
 
             var (btnSh, imgSh, lblSh) = LModeBtn(modRow, "Shift");
@@ -1739,6 +1770,13 @@ if (!lvActive || item == null) return;
             hcRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideCtrlToggleClicked);
             RefreshHideCtrlToggle();
 
+            var (cvRow, cvImg, cvThumb) = LToggleRow(c3fps, "Remember camera view",
+                "Restores top-down or default view between sessions");
+            _cameraViewToggleImage = cvImg;
+            _cameraViewToggleThumb = cvThumb;
+            cvRow.GetComponentInChildren<Button>().onClick.AddListener(OnCameraViewToggleClicked);
+            RefreshCameraViewToggle();
+
             // ── COL 3: Sleep Presets ──────────────────────────────────────
             var c3sp = LCard(col3, "Sleep Presets");
 
@@ -1751,55 +1789,79 @@ if (!lvActive || item == null) return;
 
             LPickerRow(c3sp, "Preset 1",
                 () => _preset1Hour,
-                v => { _preset1Hour = v; PlayerPrefs.SetInt(PREF_PRESET1H, v); PlayerPrefs.Save();
-                       if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; },
+                v =>
+                {
+                    _preset1Hour = v; PlayerPrefs.SetInt(PREF_PRESET1H, v); PlayerPrefs.Save();
+                    if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
+                },
                 () => _preset1Min,
-                v => { _preset1Min  = v; PlayerPrefs.SetInt(PREF_PRESET1M, v); PlayerPrefs.Save();
-                       if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}"; });
+                v =>
+                {
+                    _preset1Min = v; PlayerPrefs.SetInt(PREF_PRESET1M, v); PlayerPrefs.Save();
+                    if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
+                });
 
             LPickerRow(c3sp, "Preset 2",
                 () => _preset2Hour,
-                v => { _preset2Hour = v; PlayerPrefs.SetInt(PREF_PRESET2H, v); PlayerPrefs.Save();
-                       if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; },
+                v =>
+                {
+                    _preset2Hour = v; PlayerPrefs.SetInt(PREF_PRESET2H, v); PlayerPrefs.Save();
+                    if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
+                },
                 () => _preset2Min,
-                v => { _preset2Min  = v; PlayerPrefs.SetInt(PREF_PRESET2M, v); PlayerPrefs.Save();
-                       if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}"; });
+                v =>
+                {
+                    _preset2Min = v; PlayerPrefs.SetInt(PREF_PRESET2M, v); PlayerPrefs.Save();
+                    if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
+                });
 
             LPickerRow(c3sp, "Preset 3",
                 () => _preset3Hour,
-                v => { _preset3Hour = v; PlayerPrefs.SetInt(PREF_PRESET3H, v); PlayerPrefs.Save();
-                       if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}"; },
+                v =>
+                {
+                    _preset3Hour = v; PlayerPrefs.SetInt(PREF_PRESET3H, v); PlayerPrefs.Save();
+                    if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
+                },
                 () => _preset3Min,
-                v => { _preset3Min  = v; PlayerPrefs.SetInt(PREF_PRESET3M, v); PlayerPrefs.Save();
-                       if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}"; });
+                v =>
+                {
+                    _preset3Min = v; PlayerPrefs.SetInt(PREF_PRESET3M, v); PlayerPrefs.Save();
+                    if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
+                });
 
             LPickerRow(c3sp, "Preset 4",
                 () => _preset4Hour,
-                v => { _preset4Hour = v; PlayerPrefs.SetInt(PREF_PRESET4H, v); PlayerPrefs.Save();
-                       if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}"; },
+                v =>
+                {
+                    _preset4Hour = v; PlayerPrefs.SetInt(PREF_PRESET4H, v); PlayerPrefs.Save();
+                    if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
+                },
                 () => _preset4Min,
-                v => { _preset4Min  = v; PlayerPrefs.SetInt(PREF_PRESET4M, v); PlayerPrefs.Save();
-                       if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}"; });
+                v =>
+                {
+                    _preset4Min = v; PlayerPrefs.SetInt(PREF_PRESET4M, v); PlayerPrefs.Save();
+                    if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
+                });
 
             // ── Bottom bar ────────────────────────────────────────────────
             var bottom = LChild(panel, "Bottom", 52f);
             bottom.GetComponent<Image>().color = new Color(0.040f, 0.040f, 0.050f, 1f);
             var bHLG = bottom.AddComponent<HorizontalLayoutGroup>();
-            bHLG.padding              = new RectOffset(16, 16, 10, 10);
-            bHLG.spacing              = 10f;
-            bHLG.childAlignment       = TextAnchor.MiddleLeft;
+            bHLG.padding = new RectOffset(16, 16, 10, 10);
+            bHLG.spacing = 10f;
+            bHLG.childAlignment = TextAnchor.MiddleLeft;
             bHLG.childForceExpandHeight = false;
-            bHLG.childForceExpandWidth  = false;
+            bHLG.childForceExpandWidth = false;
 
             var closeGo = new GameObject("CloseBtn");
             closeGo.transform.SetParent(bottom.transform, false);
             closeGo.AddComponent<RectTransform>();
             var closeImg = closeGo.AddComponent<Image>();
             closeImg.sprite = GetOrCreateRoundedRectSprite();
-            closeImg.type   = Image.Type.Sliced;
-            closeImg.color  = new Color(0.55f, 0.10f, 0.10f, 1f);
+            closeImg.type = Image.Type.Sliced;
+            closeImg.color = new Color(0.55f, 0.10f, 0.10f, 1f);
             var closeLe = closeGo.AddComponent<LayoutElement>();
-            closeLe.preferredWidth  = 110f;
+            closeLe.preferredWidth = 110f;
             closeLe.preferredHeight = 32f;
             closeGo.AddComponent<Button>().onClick.AddListener(() => SetMenuVisible(false));
             var cTxtGo = new GameObject("T");
@@ -1841,7 +1903,7 @@ if (!lvActive || item == null) return;
             go.AddComponent<LayoutElement>().preferredHeight = h;
         }
 
-        // Column in the three-column content area (VLG, flex width, no ContentSizeFitter — parent HLG handles sizing)
+        // Column in the three-column content area (VLG, flex width, no ContentSizeFitter - parent HLG handles sizing)
         private static GameObject LColumn(GameObject parent, string name)
         {
             var go = new GameObject(name);
@@ -1849,19 +1911,19 @@ if (!lvActive || item == null) return;
             go.AddComponent<RectTransform>();
             go.AddComponent<Image>().color = Color.clear;
             var vlg = go.AddComponent<VerticalLayoutGroup>();
-            vlg.childAlignment      = TextAnchor.UpperLeft;
-            vlg.padding             = new RectOffset(0, 0, 0, 0);
-            vlg.spacing             = 10f;
-            vlg.childForceExpandWidth  = true;
+            vlg.childAlignment = TextAnchor.UpperLeft;
+            vlg.padding = new RectOffset(0, 0, 0, 0);
+            vlg.spacing = 10f;
+            vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
             var le = go.AddComponent<LayoutElement>();
-            le.minWidth       = 0f;
+            le.minWidth = 0f;
             le.preferredWidth = 0f;
-            le.flexibleWidth  = 1f;
+            le.flexibleWidth = 1f;
             return go;
         }
 
-        // Rounded card — one per category, black semi-transparent bg
+        // Rounded card - one per category, black semi-transparent bg
         private static GameObject LCard(GameObject parent, string categoryTitle)
         {
             var card = new GameObject($"Card_{categoryTitle}");
@@ -1869,13 +1931,15 @@ if (!lvActive || item == null) return;
             card.AddComponent<RectTransform>();
             var img = card.AddComponent<Image>();
             img.sprite = GetOrCreateRoundedRectSprite();
-            img.type   = Image.Type.Sliced;
-            img.color  = new Color(0f, 0f, 0f, 0.72f);
+            img.type = Image.Type.Sliced;
+            img.color = new Color(0f, 0f, 0f, 0.72f);
             var vlg = card.AddComponent<VerticalLayoutGroup>();
-            vlg.padding             = new RectOffset(10, 10, 10, 12);
-            vlg.spacing             = 6f;
-            vlg.childForceExpandWidth  = true;
+            vlg.padding = new RectOffset(10, 10, 10, 12);
+            vlg.spacing = 6f;
+            vlg.childForceExpandWidth = true;
             vlg.childForceExpandHeight = false;
+            var csf = card.AddComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Category label inside card
             var lbl = new GameObject("CardTitle");
@@ -1920,7 +1984,7 @@ if (!lvActive || item == null) return;
             {
                 var le = go.AddComponent<LayoutElement>();
                 if (prefW >= 0) le.preferredWidth = prefW;
-                if (flexW >= 0) le.flexibleWidth  = flexW;
+                if (flexW >= 0) le.flexibleWidth = flexW;
             }
             return go;
         }
@@ -1934,20 +1998,21 @@ if (!lvActive || item == null) return;
             row.AddComponent<RectTransform>();
             row.AddComponent<Image>().color = Color.clear;
             var hlg = row.AddComponent<HorizontalLayoutGroup>();
-            hlg.childAlignment        = TextAnchor.MiddleLeft;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
             hlg.childForceExpandHeight = false;
-            hlg.childForceExpandWidth  = false;
+            hlg.childForceExpandWidth = false;
             hlg.spacing = 12f;
             hlg.padding = new RectOffset(0, 0, 5, 5);
-            row.AddComponent<LayoutElement>().preferredHeight = string.IsNullOrEmpty(description) ? 36f : 50f;
+            var rowCSF = row.AddComponent<ContentSizeFitter>();
+            rowCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             // Text group: name + optional description
             var textGrp = new GameObject("TextGroup");
             textGrp.transform.SetParent(row.transform, false);
             textGrp.AddComponent<RectTransform>();
             var tgVLG = textGrp.AddComponent<VerticalLayoutGroup>();
-            tgVLG.childAlignment       = TextAnchor.UpperLeft;
-            tgVLG.childForceExpandWidth  = true;
+            tgVLG.childAlignment = TextAnchor.UpperLeft;
+            tgVLG.childForceExpandWidth = true;
             tgVLG.childForceExpandHeight = false;
             tgVLG.spacing = 2f;
             textGrp.AddComponent<LayoutElement>().flexibleWidth = 1f;
@@ -1960,7 +2025,9 @@ if (!lvActive || item == null) return;
             nameTMP.fontStyle = FontStyles.Bold;
             nameTMP.color = new Color(0.90f, 0.90f, 0.95f, 1f);
             nameTMP.alignment = TextAlignmentOptions.Left;
-            nameGo.AddComponent<LayoutElement>().preferredHeight = 16f;
+            nameTMP.enableWordWrapping = true;
+            nameTMP.overflowMode = TextOverflowModes.Overflow;
+            nameGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             if (!string.IsNullOrEmpty(description))
             {
@@ -1971,7 +2038,9 @@ if (!lvActive || item == null) return;
                 descTMP.text = description; descTMP.fontSize = 9.5f;
                 descTMP.color = new Color(0.38f, 0.38f, 0.48f, 1f);
                 descTMP.alignment = TextAlignmentOptions.Left;
-                descGo.AddComponent<LayoutElement>().preferredHeight = 14f;
+                descTMP.enableWordWrapping = true;
+                descTMP.overflowMode = TextOverflowModes.Overflow;
+                descGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             }
 
             // iOS-style toggle track (pill)
@@ -1980,12 +2049,15 @@ if (!lvActive || item == null) return;
             var trackRT = track.AddComponent<RectTransform>();
             var trackImg = track.AddComponent<Image>();
             trackImg.sprite = GetOrCreatePillSprite();
-            trackImg.type   = Image.Type.Sliced;
+            trackImg.type = Image.Type.Sliced;
             var trackBtn = track.AddComponent<Button>();
             trackBtn.targetGraphic = trackImg;
             var trackLE = track.AddComponent<LayoutElement>();
-            trackLE.preferredWidth  = 44f;
+            trackLE.minWidth = 44f;
+            trackLE.preferredWidth = 44f;
+            trackLE.minHeight = 24f;
             trackLE.preferredHeight = 24f;
+            trackLE.flexibleWidth = 0f;
 
             // White circle thumb
             var thumb = new GameObject("Thumb");
@@ -1995,7 +2067,7 @@ if (!lvActive || item == null) return;
             thumbRT.sizeDelta = new Vector2(18f, 18f);
             var thumbImg = thumb.AddComponent<Image>();
             thumbImg.sprite = GetOrCreateCircleSprite();
-            thumbImg.color  = Color.white;
+            thumbImg.color = Color.white;
 
             return (row, trackImg, thumbRT);
         }
@@ -2031,9 +2103,9 @@ if (!lvActive || item == null) return;
             row.AddComponent<RectTransform>();
             row.AddComponent<Image>().color = Color.clear;
             var hlg = row.AddComponent<HorizontalLayoutGroup>();
-            hlg.childAlignment       = TextAnchor.MiddleLeft;
+            hlg.childAlignment = TextAnchor.MiddleLeft;
             hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth  = false;
+            hlg.childForceExpandWidth = false;
             hlg.spacing = 10f;
             row.AddComponent<LayoutElement>().preferredHeight = 32f;
 
@@ -2176,9 +2248,9 @@ if (!lvActive || item == null) return;
         {
             switch (index)
             {
-                case 0: _autoCloseOnWASD   = !_autoCloseOnWASD;   PlayerPrefs.SetInt(PREF_AC_WASD,   _autoCloseOnWASD   ? 1 : 0); break;
-                case 1: _autoCloseOnShift  = !_autoCloseOnShift;  PlayerPrefs.SetInt(PREF_AC_SHIFT,  _autoCloseOnShift  ? 1 : 0); break;
-                case 2: _autoCloseOnSpace  = !_autoCloseOnSpace;  PlayerPrefs.SetInt(PREF_AC_SPACE,  _autoCloseOnSpace  ? 1 : 0); break;
+                case 0: _autoCloseOnWASD = !_autoCloseOnWASD; PlayerPrefs.SetInt(PREF_AC_WASD, _autoCloseOnWASD ? 1 : 0); break;
+                case 1: _autoCloseOnShift = !_autoCloseOnShift; PlayerPrefs.SetInt(PREF_AC_SHIFT, _autoCloseOnShift ? 1 : 0); break;
+                case 2: _autoCloseOnSpace = !_autoCloseOnSpace; PlayerPrefs.SetInt(PREF_AC_SPACE, _autoCloseOnSpace ? 1 : 0); break;
                 case 3: _autoCloseOnDamage = !_autoCloseOnDamage; PlayerPrefs.SetInt(PREF_AC_DAMAGE, _autoCloseOnDamage ? 1 : 0); break;
             }
             PlayerPrefs.Save();
@@ -2292,7 +2364,7 @@ if (!lvActive || item == null) return;
         {
             if (_mcChecked) return;
 
-            // Step 1: scan assemblies for ModConfigAPI — runs exactly ONCE.
+            // Step 1: scan assemblies for ModConfigAPI - runs exactly ONCE.
             // Previously, returning early when ModConfig was absent left _mcChecked = false,
             // causing the expensive GetTypes() loop to run every single frame.
             if (_mcAPI == null && !_mcScanDone)
@@ -2310,9 +2382,9 @@ if (!lvActive || item == null) return;
                 }
             }
 
-            if (_mcAPI == null) { _mcChecked = true; return; } // not installed — stop forever
+            if (_mcAPI == null) { _mcChecked = true; return; } // not installed - stop forever
 
-            // Step 2: call Initialize() — returns false if ModConfig's ModBehaviour isn't running yet.
+            // Step 2: call Initialize() - returns false if ModConfig's ModBehaviour isn't running yet.
             // Caller retries each frame via Update() until this returns true.
             bool ready = false;
             try
@@ -2324,20 +2396,20 @@ if (!lvActive || item == null) return;
             if (!ready) return;
 
             // Booleans
-            MCAddBool(PREF_ENABLED,          "Show sell value on hover",       _showValue);
-            MCAddBool(PREF_ENEMY_NAMES,      "Show enemy names",               _showEnemyNames);
-            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled",          _transferEnabled);
-            MCAddBool(PREF_AC_WASD,          "Auto-close on movement (WASD)",  _autoCloseOnWASD);
-            MCAddBool(PREF_AC_SHIFT,         "Auto-close on Shift",            _autoCloseOnShift);
-            MCAddBool(PREF_AC_SPACE,         "Auto-close on Space",            _autoCloseOnSpace);
-            MCAddBool(PREF_AC_DAMAGE,        "Auto-close on damage",           _autoCloseOnDamage);
-            MCAddBool(PREF_SLEEP_ENABLED,    "Sleep preset buttons",           _sleepPresetsEnabled);
-            MCAddBool(PREF_RECORDER_BADGE,   "Recorded items badge",           _showRecorderBadge);
-            MCAddBool(PREF_FPS_COUNTER,      "FPS counter",                    _showFps);
-            MCAddBool(PREF_AUTO_UNLOAD,            "Auto-unload gun on kill",            _autoUnloadEnabled);
-            MCAddBool(PREF_LOOTBOX_HL,             "Lootbox highlight",                  _lootboxHLEnabled);
-            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED,  "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
-            MCAddBool(PREF_KILL_FEED,              "Kill feed",                          _killFeedEnabled);
+            MCAddBool(PREF_ENABLED, "Show sell value on hover", _showValue);
+            MCAddBool(PREF_ENEMY_NAMES, "Show enemy names", _showEnemyNames);
+            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled", _transferEnabled);
+            MCAddBool(PREF_AC_WASD, "Auto-close on movement (WASD)", _autoCloseOnWASD);
+            MCAddBool(PREF_AC_SHIFT, "Auto-close on Shift", _autoCloseOnShift);
+            MCAddBool(PREF_AC_SPACE, "Auto-close on Space", _autoCloseOnSpace);
+            MCAddBool(PREF_AC_DAMAGE, "Auto-close on damage", _autoCloseOnDamage);
+            MCAddBool(PREF_SLEEP_ENABLED, "Sleep preset buttons", _sleepPresetsEnabled);
+            MCAddBool(PREF_RECORDER_BADGE, "Recorded items badge", _showRecorderBadge);
+            MCAddBool(PREF_FPS_COUNTER, "FPS counter", _showFps);
+            MCAddBool(PREF_AUTO_UNLOAD, "Auto-unload gun on kill", _autoUnloadEnabled);
+            MCAddBool(PREF_LOOTBOX_HL, "Lootbox highlight", _lootboxHLEnabled);
+            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_KILL_FEED, "Kill feed", _killFeedEnabled);
             // Dropdowns
             var modeOpts = new SortedDictionary<string, object>
             {
@@ -2355,14 +2427,14 @@ if (!lvActive || item == null) return;
             MCAddDropdown(PREF_TRANSFER_MOD, "Transfer modifier key", modOpts, typeof(int), (int)_transferModifier);
 
             // Sliders
-            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour",    typeof(int), _preset1Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min,  new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour",    typeof(int), _preset2Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min,  new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour",    typeof(int), _preset3Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min,  new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour",    typeof(int), _preset4Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min,  new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour", typeof(int), _preset1Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour", typeof(int), _preset2Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour", typeof(int), _preset3Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour", typeof(int), _preset4Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min, new Vector2(0, 50));
 
             // Change delegate
             try
@@ -2375,14 +2447,14 @@ if (!lvActive || item == null) return;
             }
             catch { }
 
-            _mcChecked = true; // Registration complete — stop retrying
+            _mcChecked = true; // Registration complete - stop retrying
         }
 
         private void OnModConfigChanged(string key)
         {
             if (_mcAPI == null) return;
 
-            if      (key == PREF_ENABLED)
+            if (key == PREF_ENABLED)
             { _showValue = MCLoadBool(key, _showValue); PlayerPrefs.SetInt(key, _showValue ? 1 : 0); RefreshToggleButton(); }
             else if (key == PREF_MODE)
             { _mode = (DisplayMode)MCLoadInt(key, (int)_mode); PlayerPrefs.SetInt(key, (int)_mode); RefreshModeButtons(); }
@@ -2393,7 +2465,7 @@ if (!lvActive || item == null) return;
             else if (key == PREF_TRANSFER_MOD)
             { _transferModifier = (TransferModifier)MCLoadInt(key, (int)_transferModifier); PlayerPrefs.SetInt(key, (int)_transferModifier); RefreshTransferModifierButtons(); }
             else if (key == PREF_AC_WASD)
-            { _autoCloseOnWASD  = MCLoadBool(key, _autoCloseOnWASD);  PlayerPrefs.SetInt(key, _autoCloseOnWASD  ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
+            { _autoCloseOnWASD = MCLoadBool(key, _autoCloseOnWASD); PlayerPrefs.SetInt(key, _autoCloseOnWASD ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
             else if (key == PREF_AC_SHIFT)
             { _autoCloseOnShift = MCLoadBool(key, _autoCloseOnShift); PlayerPrefs.SetInt(key, _autoCloseOnShift ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
             else if (key == PREF_AC_SPACE)
@@ -2454,22 +2526,31 @@ if (!lvActive || item == null) return;
 
         private void MCAddBool(string key, string desc, bool def)
         {
-            try { _mcAPI!.GetMethod("SafeAddBoolDropdownList", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, def }); }
+            try
+            {
+                _mcAPI!.GetMethod("SafeAddBoolDropdownList", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, def });
+            }
             catch { }
         }
 
         private void MCAddDropdown(string key, string desc, SortedDictionary<string, object> options, Type valueType, object def)
         {
-            try { _mcAPI!.GetMethod("SafeAddDropdownList", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, options, valueType, def }); }
+            try
+            {
+                _mcAPI!.GetMethod("SafeAddDropdownList", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, options, valueType, def });
+            }
             catch { }
         }
 
         private void MCAddSlider(string key, string desc, Type valueType, object def, Vector2 range)
         {
-            try { _mcAPI!.GetMethod("SafeAddInputWithSlider", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, valueType, def, (Vector2?)range }); }
+            try
+            {
+                _mcAPI!.GetMethod("SafeAddInputWithSlider", BindingFlags.Public | BindingFlags.Static)
+                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, valueType, def, (Vector2?)range });
+            }
             catch { }
         }
 
@@ -2520,8 +2601,8 @@ if (!lvActive || item == null) return;
             }
 
             int singleValue = (int)(item.Value / 2);
-            int stackValue  = (int)(item.GetTotalRawValue() / 2);
-            bool isStack    = item.StackCount > 1;
+            int stackValue = (int)(item.GetTotalRawValue() / 2);
+            bool isStack = item.StackCount > 1;
 
             ValueText.gameObject.SetActive(true);
             ValueText.transform.SetParent(uiInstance.LayoutParent);
@@ -2529,8 +2610,8 @@ if (!lvActive || item == null) return;
             ValueText.text = _mode switch
             {
                 DisplayMode.SingleOnly => $"${singleValue}",
-                DisplayMode.StackOnly  => $"${stackValue}",
-                _                      => isStack ? $"${singleValue} / ${stackValue}" : $"${singleValue}",
+                DisplayMode.StackOnly => $"${stackValue}",
+                _ => isStack ? $"${singleValue} / ${stackValue}" : $"${singleValue}",
             };
             ValueText.fontSize = 20f;
         }
@@ -2543,26 +2624,26 @@ if (!lvActive || item == null) return;
             Func<int> getM, Action<int> setM)
         {
             var layout = parent.AddComponent<HorizontalLayoutGroup>();
-            layout.childAlignment       = TextAnchor.MiddleCenter;
-            layout.childForceExpandWidth  = false;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
             layout.spacing = 3;
 
-            var hMinus   = MakePickerBtn(parent, "−");
+            var hMinus = MakePickerBtn(parent, "−");
             var hDisplay = MakePickerDisplay(parent, $"{getH():D2}");
-            var hPlus    = MakePickerBtn(parent, "+");
-            var colon    = MakePickerColon(parent);
-            var mMinus   = MakePickerBtn(parent, "−");
+            var hPlus = MakePickerBtn(parent, "+");
+            var colon = MakePickerColon(parent);
+            var mMinus = MakePickerBtn(parent, "−");
             var mDisplay = MakePickerDisplay(parent, $"{getM():D2}");
-            var mPlus    = MakePickerBtn(parent, "+");
+            var mPlus = MakePickerBtn(parent, "+");
 
             var hTxt = hDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
             var mTxt = mDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
 
-            hMinus.GetComponent<Button>().onClick.AddListener(() => { setH(((getH()-1)+24)%24); hTxt.text=$"{getH():D2}"; });
-            hPlus.GetComponent<Button>().onClick.AddListener(()  => { setH((getH()+1)%24);      hTxt.text=$"{getH():D2}"; });
-            mMinus.GetComponent<Button>().onClick.AddListener(() => { setM(((getM()-10)+60)%60); mTxt.text=$"{getM():D2}"; });
-            mPlus.GetComponent<Button>().onClick.AddListener(()  => { setM((getM()+10)%60);     mTxt.text=$"{getM():D2}"; });
+            hMinus.GetComponent<Button>().onClick.AddListener(() => { setH(((getH() - 1) + 24) % 24); hTxt.text = $"{getH():D2}"; });
+            hPlus.GetComponent<Button>().onClick.AddListener(() => { setH((getH() + 1) % 24); hTxt.text = $"{getH():D2}"; });
+            mMinus.GetComponent<Button>().onClick.AddListener(() => { setM(((getM() - 10) + 60) % 60); mTxt.text = $"{getM():D2}"; });
+            mPlus.GetComponent<Button>().onClick.AddListener(() => { setM((getM() + 10) % 60); mTxt.text = $"{getM():D2}"; });
         }
 
         private static GameObject MakePickerBtn(GameObject parent, string label)
@@ -2574,9 +2655,9 @@ if (!lvActive || item == null) return;
             var img = go.AddComponent<Image>();
             img.color = new Color(0.38f, 0.26f, 0f, 1f);
             var btn = go.AddComponent<Button>();
-            var c   = btn.colors;
+            var c = btn.colors;
             c.highlightedColor = new Color(0.55f, 0.38f, 0f, 1f);
-            c.pressedColor     = new Color(0.22f, 0.15f, 0f, 1f);
+            c.pressedColor = new Color(0.22f, 0.15f, 0f, 1f);
             btn.colors = c;
             var t = new GameObject("T");
             t.transform.SetParent(go.transform, false);
@@ -2622,7 +2703,7 @@ if (!lvActive || item == null) return;
         // ── Kill Feed ─────────────────────────────────────────────────────
 
         // Subscribed to the static Health.OnDead event (same approach as the KillFeed mod).
-        // Fires for every death in the game — no scanning, no polling needed.
+        // Fires for every death in the game - no scanning, no polling needed.
         private void OnKillFeedDeadDirect(Health health, DamageInfo dmgInfo)
         {
             if (!_killFeedEnabled) return;
@@ -2640,7 +2721,7 @@ if (!lvActive || item == null) return;
 
             bool headshot = dmgInfo.crit > 0;
             string prefix = headshot ? "<color=#FF6060>[HS]</color> " : "";
-            string entry  = killerName.Length > 0
+            string entry = killerName.Length > 0
                 ? $"{prefix}{killerName} → {victimName}"
                 : $"{prefix}→ {victimName}";
             AddKillFeedEntry(entry);
@@ -2663,7 +2744,7 @@ if (!lvActive || item == null) return;
             _killFeedCanvas = new GameObject("KillFeed");
             DontDestroyOnLoad(_killFeedCanvas);
             var canvas = _killFeedCanvas.AddComponent<Canvas>();
-            canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 90;
             _killFeedCanvas.AddComponent<CanvasScaler>();
             _killFeedCanvas.AddComponent<GraphicRaycaster>();
@@ -2671,18 +2752,18 @@ if (!lvActive || item == null) return;
             _killFeedContainer = new GameObject("Container");
             _killFeedContainer.transform.SetParent(_killFeedCanvas.transform, false);
             var rt = _killFeedContainer.AddComponent<RectTransform>();
-            rt.anchorMin        = new Vector2(1f, 1f);
-            rt.anchorMax        = new Vector2(1f, 1f);
-            rt.pivot            = new Vector2(1f, 1f);
+            rt.anchorMin = new Vector2(1f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(1f, 1f);
             rt.anchoredPosition = new Vector2(-32f, _hideCtrlHint ? -76f : -152f);
-            rt.sizeDelta        = new Vector2(0f, 0f);
+            rt.sizeDelta = new Vector2(0f, 0f);
             var vlg = _killFeedContainer.AddComponent<VerticalLayoutGroup>();
-            vlg.childAlignment         = TextAnchor.UpperRight;
-            vlg.childForceExpandWidth  = false;
+            vlg.childAlignment = TextAnchor.UpperRight;
+            vlg.childForceExpandWidth = false;
             vlg.childForceExpandHeight = false;
             vlg.spacing = 4f;
             var csf = _killFeedContainer.AddComponent<ContentSizeFitter>();
-            csf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             csf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
 
@@ -2702,21 +2783,21 @@ if (!lvActive || item == null) return;
             go.transform.SetAsFirstSibling();
 
             var img = go.AddComponent<Image>();
-            img.color  = new Color(0f, 0f, 0f, 0.55f);
+            img.color = new Color(0f, 0f, 0f, 0.55f);
             img.sprite = GetOrCreateRoundedRectSprite();
-            img.type   = Image.Type.Sliced;
+            img.type = Image.Type.Sliced;
 
             // HorizontalLayoutGroup + ContentSizeFitter shrink-wraps the pill to text width
             var hlg = go.AddComponent<HorizontalLayoutGroup>();
-            hlg.padding               = new RectOffset(8, 8, 4, 4);
-            hlg.childAlignment        = TextAnchor.MiddleCenter;
-            hlg.childControlWidth     = true;
-            hlg.childControlHeight    = true;
-            hlg.childForceExpandWidth  = false;
+            hlg.padding = new RectOffset(8, 8, 4, 4);
+            hlg.childAlignment = TextAnchor.MiddleCenter;
+            hlg.childControlWidth = true;
+            hlg.childControlHeight = true;
+            hlg.childForceExpandWidth = false;
             hlg.childForceExpandHeight = false;
             var entryCsf = go.AddComponent<ContentSizeFitter>();
             entryCsf.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            entryCsf.verticalFit   = ContentSizeFitter.FitMode.PreferredSize;
+            entryCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
             var cg = go.AddComponent<CanvasGroup>();
             cg.alpha = 0f;
@@ -2726,15 +2807,15 @@ if (!lvActive || item == null) return;
             var tmp = txtGo.AddComponent<TextMeshProUGUI>();
             var templateTmp = GameplayDataSettings.UIStyle.TemplateTextUGUI;
             if (templateTmp != null) tmp.font = templateTmp.font;
-            tmp.text               = text;
-            tmp.fontSize           = 12f;
-            tmp.color              = Color.white;
-            tmp.alignment          = TextAlignmentOptions.MidlineRight;
+            tmp.text = text;
+            tmp.fontSize = 12f;
+            tmp.color = Color.white;
+            tmp.alignment = TextAlignmentOptions.MidlineRight;
             tmp.enableWordWrapping = false;
-            tmp.overflowMode       = TextOverflowModes.Overflow;
-            tmp.richText           = true;
+            tmp.overflowMode = TextOverflowModes.Overflow;
+            tmp.richText = true;
             var shadow = txtGo.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor    = new Color(0f, 0f, 0f, 0.9f);
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
             shadow.effectDistance = new Vector2(1f, -1f);
 
             _kfEntries.Insert(0, new KfEntry(go, cg, KF_DISPLAY + KF_FADE));
@@ -2749,9 +2830,9 @@ if (!lvActive || item == null) return;
                 e.Timer -= Time.deltaTime;
 
                 float alpha;
-                if      (e.Timer > KF_DISPLAY) alpha = (KF_DISPLAY + KF_FADE - e.Timer) / KF_FADE;
-                else if (e.Timer > KF_FADE)    alpha = 1f;
-                else if (e.Timer > 0f)         alpha = e.Timer / KF_FADE;
+                if (e.Timer > KF_DISPLAY) alpha = (KF_DISPLAY + KF_FADE - e.Timer) / KF_FADE;
+                else if (e.Timer > KF_FADE) alpha = 1f;
+                else if (e.Timer > 0f) alpha = e.Timer / KF_FADE;
                 else { Destroy(e.Go); _kfEntries.RemoveAt(i); continue; }
 
                 e.Group.alpha = alpha;
@@ -2805,6 +2886,22 @@ if (!lvActive || item == null) return;
                 if (rt != null)
                     rt.anchoredPosition = new Vector2(-32f, _hideCtrlHint ? -76f : -152f);
             }
+        }
+
+        // ── Camera View Persistence ───────────────────────────────────────
+
+        private void OnCameraViewToggleClicked()
+        {
+            _cameraViewPersist = !_cameraViewPersist;
+            PlayerPrefs.SetInt(PREF_CAMERA_VIEW, _cameraViewPersist ? 1 : 0);
+            PlayerPrefs.Save();
+            RefreshCameraViewToggle();
+        }
+
+        private void RefreshCameraViewToggle()
+        {
+            if (_cameraViewToggleImage != null)
+                RefreshIOSToggle(_cameraViewToggleImage, _cameraViewToggleThumb!, _cameraViewPersist);
         }
 
         // ── Quest Favorites ───────────────────────────────────────────────
