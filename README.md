@@ -1,6 +1,6 @@
 # All In One - m0n0t0ny's Mod
 
-A quality-of-life mod for **Escape from Duckov** with 14 independent features, all toggleable from the **F9** settings panel.
+All-in-one quality of life mod for **Escape from Duckov**. 14 independent features, all toggleable from the **F9** settings menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -17,73 +17,79 @@ All settings are persisted and configurable from the **F9** panel in-game.
 
 ---
 
-### Item sell value on hover
+### 🎒 Looting
 
-Shows the sell value of an item directly on hover - single unit, full stack, and combined.
+#### Item sell value on hover
+Shows the sell price of any item at any time, not just in shops. Choose between single, stack total, or combined display.
 
 ![Item sell value](assets/item-sell-value.png)
 
----
+#### Item transfer
+Modifier+click (Shift or Alt) to instantly move items between an open container and your backpack.
 
-### Enemy names above health bar
+#### Auto-unload on loot
+When you open a dead enemy's loot, their gun is automatically unloaded - ammo and magazines go directly into the stash, ready to grab.
 
-Displays the enemy's name above their health bar during combat.
-
-![Enemy names](assets/enemy-names.png)
-
----
-
-### Loot container highlight
-
-Gold outline on all lootable containers so you never miss one.
-
-![Loot container highlight](assets/lootbox-highlight.png)
-
----
-
-### Sleep presets
-
-One-click sleep buttons for common weather conditions: rain, Storm I, Storm II, post-storm, and 4 fully customizable time slots.
-
-![Sleep presets](assets/sleep-presets.png)
-
----
-
-### Recorded items badge
-
-A ✓ badge on keys and blueprints you have already recorded, so you know at a glance what to keep and what to sell.
+#### Recorded items badge
+A green checkmark on keys and blueprints you have already recorded, so you know at a glance what to keep and what to sell.
 
 ![Recorded items badge](assets/recorded-items-badge.png)
 
----
+#### Lootbox highlight
+Gold outline on loot containers in the world so you never miss one. Optional "only unsearched" mode hides the outline on already-opened containers.
 
-### Quest favorites
-
-Pin a quest to the top of the list with **N**. The pinned quest is always visible regardless of filters.
-
-![Quest favorites](assets/quest-favorites.png)
+![Lootbox highlight](assets/lootbox-highlight.png)
 
 ---
 
-### Hide controls hint
+### ⚔️ Combat
 
+#### Enemy names
+Displays the enemy name above their health bar.
+
+![Enemy names](assets/enemy-names.png)
+
+#### Kill feed
+Shows kills in the top-right corner during raids - killer, victim, and [HS] tag on headshots.
+
+#### Skip melee on scroll
+Scroll wheel skips the melee slot when cycling weapons. Melee can still be equipped via V.
+
+---
+
+### 🌙 Survival
+
+#### Sleep presets
+Wake-up preset buttons on the sleep screen: 4 custom configurable times, plus rain, Storm I, Storm II, and post-storm.
+
+![Sleep presets](assets/sleep-presets.png)
+
+#### Auto-close container
+Automatically closes an open container when pressing WASD, Shift, Space, or on taking damage. Each trigger is independently toggleable.
+
+---
+
+### 🖥️ HUD
+
+#### FPS counter
+Displays current FPS in the top-right corner (OFF by default).
+
+#### Hide controls hint
 Hides the native Controls [O] button and its submenu to reduce HUD clutter.
 
 ![Hide controls hint](assets/hide-controls-hint.png)
 
+#### Camera view persistence
+Remembers your camera preference (top-down or default) between sessions, and restores it automatically on load.
+
 ---
 
-### Additional features
+### ⭐ Quests
 
-| Feature                                                 | Default | Key                         |
-| ------------------------------------------------------- | ------- | --------------------------- |
-| Modifier+click to transfer items (container ↔ backpack) | ON      | Shift or Alt (configurable) |
-| Auto-close container on WASD / Shift / Space / damage   | OFF     | -                           |
-| FPS counter (top-right)                                 | OFF     | -                           |
-| Skip melee slot on scroll wheel                         | ON      | -                           |
-| Auto-unload enemy gun on kill                           | ON      | -                           |
-| Kill feed - killer → victim, [HS] on headshots          | ON      | -                           |
-| Remember camera view (top-down vs default)              | ON      | -                           |
+#### Quest favorites
+Press N on a selected quest to pin it to the top of the list. Pinned quests are always visible regardless of filters.
+
+![Quest favorites](assets/quest-favorites.png)
 
 ---
 
@@ -92,7 +98,7 @@ Hides the native Controls [O] button and its submenu to reduce HUD clutter.
 ### Steam (recommended)
 
 1. Subscribe on the [Steam Workshop page](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
-2. Launch the game → **Mods** in the main menu → enable the mod
+2. Launch the game -> **Mods** in the main menu -> enable the mod
 
 The mod updates automatically whenever a new version is published.
 
@@ -107,7 +113,7 @@ The mod updates automatically whenever a new version is published.
    | Epic Games (Windows) | `C:\Program Files\Epic Games\EscapeFromDuckov\Duckov_Data\Mods\`                     |
    | Steam (Linux)        | `~/.steam/steam/steamapps/common/Escape from Duckov/Duckov_Data/Mods/`               |
 
-3. Launch the game → **Mods** in the main menu → enable the mod
+3. Launch the game -> **Mods** in the main menu -> enable the mod
 
 To update manually, replace the `AllInOneMod_m0n0t0ny` folder with the new version.
 

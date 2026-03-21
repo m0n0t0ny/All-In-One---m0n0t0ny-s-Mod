@@ -38,6 +38,7 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_ENEMY_NAMES = "DisplayItemValue_EnemyNames";
         private const string PREF_TRANSFER_ENABLED = "DisplayItemValue_TransferEnabled";
         private const string PREF_TRANSFER_MOD = "DisplayItemValue_TransferMod";
+        private const string PREF_TRANSFER_COMBO = "DisplayItemValue_TransferCombo";
         private const string PREF_AC_WASD = "DisplayItemValue_ACWasd";
         private const string PREF_AC_SHIFT = "DisplayItemValue_ACShift";
         private const string PREF_AC_SPACE = "DisplayItemValue_ACSpace";
@@ -156,6 +157,7 @@ namespace AllInOneMod_m0n0t0ny
         // ── ModConfig integration (optional) ─────────────────────────────
         private static Type? _mcAPI;
         private bool _mcChecked;
+        private bool _mcDelegateRegistered;
         private Action<string>? _mcDelegate;
 
         // ── Factory Recorder badge ────────────────────────────────────────
@@ -1606,6 +1608,32 @@ namespace AllInOneMod_m0n0t0ny
             ["Hides the 'Controls [O]' button in the HUD"] = new[] { "Cache le bouton 'Contrôles [O]'", "Versteckt 'Steuerung [O]'-Taste", "隐藏'操作[O]'按钮", "隱藏'操作[O]'按鈕", "'操作[O]'ボタンを非表示", "'조작[O]' 버튼 숨기기", "Oculta botão 'Controles [O]'", "Скрывает кнопку 'Управление [O]'", "Oculta botón 'Controles [O]'" },
             ["Restores top-down or default view between sessions"] = new[] { "Restaure la vue entre sessions", "Stellt Ansicht zwischen Sessions her", "会话间恢复相机视角", "會話間恢復相機視角", "セッション間でビューを復元", "세션 간 뷰 복원", "Restaura visão entre sessões", "Восстанавливает вид между сессиями", "Restaura vista entre sesiones" },
             ["Adds preset buttons to the sleep screen"] = new[] { "Ajoute des boutons de réveil", "Fügt Schlaf-Schnelltasten hinzu", "在睡眠界面添加预设按钮", "在睡眠介面添加預設按鈕", "睡眠画面にプリセットボタン追加", "수면 화면에 프리셋 버튼 추가", "Adiciona botões na tela de dormir", "Добавляет кнопки на экран сна", "Añade botones en pantalla de sueño" },
+            // ModConfig labels (re-registered on language change)
+            ["Sleep preset buttons"] = new[] { "Boutons de préréglage sommeil", "Schlaf-Voreinstellungs-Tasten", "睡眠预设按钮", "睡眠預設按鈕", "睡眠プリセットボタン", "수면 프리셋 버튼", "Botões de preset de sono", "Кнопки предустановки сна", "Botones de preajuste de sueño" },
+            ["Lootbox highlight"] = new[] { "Surbrillance des caisses", "Container-Hervorhebung", "战利品箱高亮", "戰利品箱高亮", "ルートボックス強調", "루트박스 강조", "Destaque de caixas", "Подсветка контейнеров", "Resaltar cajas de botín" },
+            ["Lootbox highlight: only unsearched"] = new[] { "Surbrillance: non fouillés seul.", "Hervorhebung: nur Ungesucht", "高亮：仅未搜寻", "高亮：僅未搜尋", "強調：未探索のみ", "강조: 미수색만", "Destaque: apenas não vasc.", "Подсветка: только необысканные", "Resaltar: solo sin registrar" },
+            ["FPS counter"] = new[] { "Compteur FPS", "FPS-Anzeige", "帧率计数器", "幀率計數器", "FPSカウンター", "FPS 카운터", "Contador FPS", "Счётчик FPS", "Contador FPS" },
+            ["Recorded items badge"] = new[] { "Badge objets enregistrés", "Badge erfasste Gegenstände", "已记录物品徽章", "已記錄物品徽章", "記録済みバッジ", "기록된 아이템 뱃지", "Badge de itens registrados", "Значок записанных предметов", "Insignia de objetos registrados" },
+            ["Auto-close on movement (WASD)"] = new[] { "Fermeture auto au mouvement", "Auto-Schließen bei Bewegung", "移动时自动关闭 (WASD)", "移動時自動關閉 (WASD)", "移動で自動閉鎖 (WASD)", "이동 시 자동 닫기 (WASD)", "Fechar auto ao mover (WASD)", "Авто-закрытие при движении (WASD)", "Cerrar auto al mover (WASD)" },
+            ["Auto-close on Shift"] = new[] { "Fermeture auto sur Shift", "Auto-Schließen bei Shift", "按Shift时自动关闭", "按Shift時自動關閉", "Shiftで自動閉鎖", "Shift로 자동 닫기", "Fechar auto com Shift", "Авто-закрытие при Shift", "Cerrar auto con Shift" },
+            ["Auto-close on Space"] = new[] { "Fermeture auto sur Espace", "Auto-Schließen bei Leertaste", "按空格时自动关闭", "按空格時自動關閉", "スペースで自動閉鎖", "스페이스로 자동 닫기", "Fechar auto com Espaço", "Авто-закрытие при Пробеле", "Cerrar auto con Espacio" },
+            ["Auto-close on damage"] = new[] { "Fermeture auto aux dégâts", "Auto-Schließen bei Schaden", "受伤时自动关闭", "受傷時自動關閉", "ダメージで自動閉鎖", "피격 시 자동 닫기", "Fechar auto ao tomar dano", "Авто-закрытие при уроне", "Cerrar auto al recibir daño" },
+            ["Sell value display mode"] = new[] { "Mode d'affichage de la valeur", "Anzeigemodus für Verkaufswert", "售价显示模式", "售價顯示模式", "売値表示モード", "판매가 표시 모드", "Modo de exibição de valor", "Режим отображения цены", "Modo de visualización de valor" },
+            ["Combined"] = new[] { "Combiné", "Kombiniert", "组合", "組合", "複合", "복합", "Combinado", "Комбинированный", "Combinado" },
+            ["Single only"] = new[] { "Unité seulement", "Nur einzeln", "仅单个", "僅單個", "単体のみ", "단일만", "Somente unitário", "Только единица", "Solo unitario" },
+            ["Stack only"] = new[] { "Pile seulement", "Nur Stapel", "仅堆叠", "僅堆疊", "スタックのみ", "스택만", "Somente pilha", "Только стопка", "Solo pila" },
+            ["Item transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de item", "Перенос предметов", "Transferencia de objetos" },
+            ["Disabled"] = new[] { "Désactivé", "Deaktiviert", "禁用", "禁用", "無効", "비활성화", "Desativado", "Отключено", "Desactivado" },
+            ["Shift + Left Click"] = new[] { "Shift+Clic gauche", "Shift+Linksklick", "Shift+左键单击", "Shift+左鍵單擊", "Shift+左クリック", "Shift+좌클릭", "Shift+Clique esquerdo", "Shift+Левый клик", "Shift+Clic izquierdo" },
+            ["Alt + Left Click"] = new[] { "Alt+Clic gauche", "Alt+Linksklick", "Alt+左键单击", "Alt+左鍵單擊", "Alt+左クリック", "Alt+좌클릭", "Alt+Clique esquerdo", "Alt+Левый клик", "Alt+Clic izquierdo" },
+            ["Preset 1 - hour"] = new[] { "Prérégl. 1 - heure", "Voreinst. 1 - Stunde", "预设 1 - 小时", "預設 1 - 小時", "プリセット 1 - 時間", "프리셋 1 - 시간", "Predefinição 1 - hora", "Пресет 1 - час", "Preajuste 1 - hora" },
+            ["Preset 1 - min"] = new[] { "Prérégl. 1 - min", "Voreinst. 1 - Min.", "预设 1 - 分钟", "預設 1 - 分鐘", "プリセット 1 - 分", "프리셋 1 - 분", "Predefinição 1 - min", "Пресет 1 - мин", "Preajuste 1 - min" },
+            ["Preset 2 - hour"] = new[] { "Prérégl. 2 - heure", "Voreinst. 2 - Stunde", "预设 2 - 小时", "預設 2 - 小時", "プリセット 2 - 時間", "프리셋 2 - 시간", "Predefinição 2 - hora", "Пресет 2 - час", "Preajuste 2 - hora" },
+            ["Preset 2 - min"] = new[] { "Prérégl. 2 - min", "Voreinst. 2 - Min.", "预设 2 - 分钟", "預設 2 - 分鐘", "プリセット 2 - 分", "프리셋 2 - 분", "Predefinição 2 - min", "Пресет 2 - мин", "Preajuste 2 - min" },
+            ["Preset 3 - hour"] = new[] { "Prérégl. 3 - heure", "Voreinst. 3 - Stunde", "预设 3 - 小时", "預設 3 - 小時", "プリセット 3 - 時間", "프리셋 3 - 시간", "Predefinição 3 - hora", "Пресет 3 - час", "Preajuste 3 - hora" },
+            ["Preset 3 - min"] = new[] { "Prérégl. 3 - min", "Voreinst. 3 - Min.", "预设 3 - 分钟", "預設 3 - 分鐘", "プリセット 3 - 分", "프리셋 3 - 분", "Predefinição 3 - min", "Пресет 3 - мин", "Preajuste 3 - min" },
+            ["Preset 4 - hour"] = new[] { "Prérégl. 4 - heure", "Voreinst. 4 - Stunde", "预设 4 - 小时", "預設 4 - 小時", "プリセット 4 - 時間", "프리셋 4 - 시간", "Predefinição 4 - hora", "Пресет 4 - час", "Preajuste 4 - hora" },
+            ["Preset 4 - min"] = new[] { "Prérégl. 4 - min", "Voreinst. 4 - Min.", "预设 4 - 分钟", "預設 4 - 分鐘", "プリセット 4 - 分", "프리셋 4 - 분", "Predefinição 4 - min", "Пресет 4 - мин", "Preajuste 4 - min" },
         };
 
         private static string L(string key)
@@ -1623,6 +1651,8 @@ namespace AllInOneMod_m0n0t0ny
             if (_settingsCanvas != null) { UnityEngine.Object.Destroy(_settingsCanvas); _settingsCanvas = null; _settingsCanvasComp = null; }
             BuildSettingsPanel();
             if (wasOpen) SetMenuVisible(true);
+            // Re-register ModConfig labels in the new language (delegate registration is skipped via _mcDelegateRegistered)
+            if (_mcAPI != null) _mcChecked = false;
         }
 
         // ── Settings Panel ────────────────────────────────────────────────
@@ -2518,64 +2548,69 @@ namespace AllInOneMod_m0n0t0ny
             // so the last registered setting appears at the top of the list.
 
             // Sliders (sleep presets) - displayed last, registered first
-            MCAddSlider(PREF_PRESET4M, "Preset 4 - minutes", typeof(int), _preset4Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET4H, "Preset 4 - hour", typeof(int), _preset4Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET3M, "Preset 3 - minutes", typeof(int), _preset3Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET3H, "Preset 3 - hour", typeof(int), _preset3Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET2M, "Preset 2 - minutes", typeof(int), _preset2Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET2H, "Preset 2 - hour", typeof(int), _preset2Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET1M, "Preset 1 - minutes", typeof(int), _preset1Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET1H, "Preset 1 - hour", typeof(int), _preset1Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET4M, L("Preset 4 - min"), typeof(int), _preset4Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET4H, L("Preset 4 - hour"), typeof(int), _preset4Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET3M, L("Preset 3 - min"), typeof(int), _preset3Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET3H, L("Preset 3 - hour"), typeof(int), _preset3Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET2M, L("Preset 2 - min"), typeof(int), _preset2Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET2H, L("Preset 2 - hour"), typeof(int), _preset2Hour, new Vector2(0, 23));
+            MCAddSlider(PREF_PRESET1M, L("Preset 1 - min"), typeof(int), _preset1Min, new Vector2(0, 50));
+            MCAddSlider(PREF_PRESET1H, L("Preset 1 - hour"), typeof(int), _preset1Hour, new Vector2(0, 23));
 
-            MCAddBool(PREF_SLEEP_ENABLED, "Sleep preset buttons", _sleepPresetsEnabled);
-            MCAddBool(PREF_CAMERA_VIEW, "Remember camera view", _cameraViewPersist);
-            MCAddBool(PREF_HIDE_CTRL, "Hide controls hint", _hideCtrlHint);
-            MCAddBool(PREF_QUEST_FAV, "Quest favorites (N key)", _questFavEnabled);
-            MCAddBool(PREF_KILL_FEED, "Kill feed", _killFeedEnabled);
-            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, "Lootbox highlight: only unsearched", _lootboxHLOnlyUnsearched);
-            MCAddBool(PREF_LOOTBOX_HL, "Lootbox highlight", _lootboxHLEnabled);
-            MCAddBool(PREF_AUTO_UNLOAD, "Auto-unload gun on kill", _autoUnloadEnabled);
-            MCAddBool(PREF_FPS_COUNTER, "FPS counter", _showFps);
-            MCAddBool(PREF_RECORDER_BADGE, "Recorded items badge", _showRecorderBadge);
-            MCAddBool(PREF_AC_DAMAGE, "Auto-close on damage", _autoCloseOnDamage);
-            MCAddBool(PREF_AC_SPACE, "Auto-close on Space", _autoCloseOnSpace);
-            MCAddBool(PREF_AC_WASD, "Auto-close on movement (WASD)", _autoCloseOnWASD);
-            MCAddBool(PREF_AC_SHIFT, "Auto-close on Shift/Alt", _autoCloseOnShift);
+            MCAddBool(PREF_SLEEP_ENABLED, L("Sleep preset buttons"), _sleepPresetsEnabled);
+            MCAddBool(PREF_CAMERA_VIEW, L("Remember camera view"), _cameraViewPersist);
+            MCAddBool(PREF_HIDE_CTRL, L("Hide controls hint"), _hideCtrlHint);
+            MCAddBool(PREF_QUEST_FAV, L("Quest favorites (N key)"), _questFavEnabled);
+            MCAddBool(PREF_KILL_FEED, L("Kill feed"), _killFeedEnabled);
+            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, L("Lootbox highlight: only unsearched"), _lootboxHLOnlyUnsearched);
+            MCAddBool(PREF_LOOTBOX_HL, L("Lootbox highlight"), _lootboxHLEnabled);
+            MCAddBool(PREF_AUTO_UNLOAD, L("Auto-unload gun on kill"), _autoUnloadEnabled);
+            MCAddBool(PREF_FPS_COUNTER, L("FPS counter"), _showFps);
+            MCAddBool(PREF_RECORDER_BADGE, L("Recorded items badge"), _showRecorderBadge);
+            MCAddBool(PREF_AC_DAMAGE, L("Auto-close on damage"), _autoCloseOnDamage);
+            MCAddBool(PREF_AC_SPACE, L("Auto-close on Space"), _autoCloseOnSpace);
+            MCAddBool(PREF_AC_SHIFT, L("Auto-close on Shift"), _autoCloseOnShift);
+            MCAddBool(PREF_AC_WASD, L("Auto-close on movement (WASD)"), _autoCloseOnWASD);
 
-            // Dropdowns
-            var modOpts = new SortedDictionary<string, object>
+            // Unified item transfer dropdown: Disabled / Shift + Left Click / Alt + Left Click
+            var transferComboOpts = new SortedDictionary<string, object>
             {
-                { "Shift", (int)TransferModifier.Shift },
-                { "Alt",   (int)TransferModifier.Alt   },
+                { L("Disabled"),         0 },
+                { L("Shift + Left Click"), 1 },
+                { L("Alt + Left Click"),   2 },
             };
-            MCAddDropdown(PREF_TRANSFER_MOD, "Transfer modifier key", modOpts, typeof(int), (int)_transferModifier);
+            int transferComboDefault = !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2);
+            MCAddDropdown(PREF_TRANSFER_COMBO, L("Item transfer"), transferComboOpts, typeof(int), transferComboDefault);
 
-            MCAddBool(PREF_TRANSFER_ENABLED, "Item transfer enabled", _transferEnabled);
-            MCAddBool(PREF_ENEMY_NAMES, "Show enemy names", _showEnemyNames);
+            MCAddBool(PREF_ENEMY_NAMES, L("Show enemy names"), _showEnemyNames);
 
             var modeOpts = new SortedDictionary<string, object>
             {
-                { "Combined",    (int)DisplayMode.Combined    },
-                { "Single only", (int)DisplayMode.SingleOnly  },
-                { "Stack only",  (int)DisplayMode.StackOnly   },
+                { L("Combined"),    (int)DisplayMode.Combined    },
+                { L("Single only"), (int)DisplayMode.SingleOnly  },
+                { L("Stack only"),  (int)DisplayMode.StackOnly   },
             };
-            MCAddDropdown(PREF_MODE, "Sell value display mode", modeOpts, typeof(int), (int)_mode);
+            MCAddDropdown(PREF_MODE, L("Sell value display mode"), modeOpts, typeof(int), (int)_mode);
 
             // Last registered = first displayed
-            MCAddBool(PREF_ENABLED, "Show sell value on hover", _showValue);
+            MCAddBool(PREF_ENABLED, L("Show sell value on hover"), _showValue);
 
-            // Change delegate
-            try
+            // Change delegate - register only once; on language re-registration this is skipped
+            if (!_mcDelegateRegistered)
             {
-                _mcDelegate = OnModConfigChanged;
-                _mcAPI.GetMethod("SafeAddOnOptionsChangedDelegate",
-                        BindingFlags.Public | BindingFlags.Static, null,
-                        new[] { typeof(Action<string>) }, null)
-                    ?.Invoke(null, new object[] { _mcDelegate });
+                try
+                {
+                    _mcDelegate = OnModConfigChanged;
+                    _mcAPI.GetMethod("SafeAddOnOptionsChangedDelegate",
+                            BindingFlags.Public | BindingFlags.Static, null,
+                            new[] { typeof(Action<string>) }, null)
+                        ?.Invoke(null, new object[] { _mcDelegate });
+                    _mcDelegateRegistered = true;
+                }
+                catch { }
             }
-            catch { }
 
-            _mcChecked = true; // Registration complete - stop retrying
+            _mcChecked = true; // Registration complete - stop retrying until next language change
         }
 
         private void OnModConfigChanged(string key)
@@ -2588,10 +2623,18 @@ namespace AllInOneMod_m0n0t0ny
             { _mode = (DisplayMode)MCLoadInt(key, (int)_mode); PlayerPrefs.SetInt(key, (int)_mode); RefreshModeButtons(); }
             else if (key == PREF_ENEMY_NAMES)
             { _showEnemyNames = MCLoadBool(key, _showEnemyNames); PlayerPrefs.SetInt(key, _showEnemyNames ? 1 : 0); RefreshEnemyNamesToggle(); }
-            else if (key == PREF_TRANSFER_ENABLED)
-            { _transferEnabled = MCLoadBool(key, _transferEnabled); PlayerPrefs.SetInt(key, _transferEnabled ? 1 : 0); RefreshTransferToggle(); RefreshShiftConflict(); }
-            else if (key == PREF_TRANSFER_MOD)
-            { _transferModifier = (TransferModifier)MCLoadInt(key, (int)_transferModifier); PlayerPrefs.SetInt(key, (int)_transferModifier); RefreshTransferModifierButtons(); }
+            else if (key == PREF_TRANSFER_COMBO)
+            {
+                int v = MCLoadInt(key, !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2));
+                _transferEnabled = v != 0;
+                if (v == 1) _transferModifier = TransferModifier.Shift;
+                else if (v == 2) _transferModifier = TransferModifier.Alt;
+                PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, _transferEnabled ? 1 : 0);
+                PlayerPrefs.SetInt(PREF_TRANSFER_MOD, (int)_transferModifier);
+                RefreshTransferToggle();
+                RefreshTransferModifierButtons();
+                RefreshShiftConflict();
+            }
             else if (key == PREF_AC_WASD)
             { _autoCloseOnWASD = MCLoadBool(key, _autoCloseOnWASD); PlayerPrefs.SetInt(key, _autoCloseOnWASD ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
             else if (key == PREF_AC_SHIFT)
