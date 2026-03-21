@@ -19,7 +19,7 @@ All settings are persisted and configurable from the **F9** panel in-game.
 
 ### Item sell value on hover
 
-Shows the sell value of an item directly on hover - single unit, full stack, and combined total.
+Shows the sell value of an item directly on hover - single unit, full stack, and combined.
 
 ![Item sell value](assets/item-sell-value.png)
 
