@@ -2149,7 +2149,7 @@ namespace AllInOneMod_m0n0t0ny
                         PlayerPrefs.Save();
                     });
                 // idx: 0=All, 1=Only unsearched, 2=Off
-                AddCycle(L("Highlight loot container"), new[] { L("All"), L("Only unsearched"), L("Off") },
+                AddCycle(L("Lootbox highlight"), new[] { L("All"), L("Only unsearched"), L("Off") },
                     !_lootboxHLEnabled ? 2 : (_lootboxHLOnlyUnsearched ? 1 : 0),
                     idx =>
                     {
@@ -2157,14 +2157,14 @@ namespace AllInOneMod_m0n0t0ny
                         else { _lootboxHLEnabled = true; _lootboxHLOnlyUnsearched = idx == 1; PlayerPrefs.SetInt(PREF_LOOTBOX_HL, 1); PlayerPrefs.SetInt(PREF_LOOTBOX_HL_UNSEARCHED, idx == 1 ? 1 : 0); }
                         PlayerPrefs.Save();
                     });
-                AddToggle(L("Badge on recorded Keys and Blueprints"), _showRecorderBadge, v => { _showRecorderBadge = v; PlayerPrefs.SetInt(PREF_RECORDER_BADGE, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Badge on recorded keys and Blueprints"), _showRecorderBadge, v => { _showRecorderBadge = v; PlayerPrefs.SetInt(PREF_RECORDER_BADGE, v ? 1 : 0); PlayerPrefs.Save(); });
             });
 
             // ── Combat ────────────────────────────────────────────────────────
             AddSection(L("Combat"), () =>
             {
                 AddToggle(L("Show enemy name"), _showEnemyNames, v => { _showEnemyNames = v; PlayerPrefs.SetInt(PREF_ENEMY_NAMES, v ? 1 : 0); PlayerPrefs.Save(); });
-                AddToggle(L("Auto-unload enemy gun on kill"), _autoUnloadEnabled, v => { _autoUnloadEnabled = v; PlayerPrefs.SetInt(PREF_AUTO_UNLOAD, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Auto-unload gun on kill"), _autoUnloadEnabled, v => { _autoUnloadEnabled = v; PlayerPrefs.SetInt(PREF_AUTO_UNLOAD, v ? 1 : 0); PlayerPrefs.Save(); });
                 AddToggle(L("Kill feed"), _killFeedEnabled, v => { _killFeedEnabled = v; PlayerPrefs.SetInt(PREF_KILL_FEED, v ? 1 : 0); PlayerPrefs.Save(); });
                 AddToggle(L("Skip melee on scroll"), _skipMeleeOnScroll, v => { _skipMeleeOnScroll = v; PlayerPrefs.SetInt(PREF_SKIP_MELEE, v ? 1 : 0); PlayerPrefs.Save(); });
             });
@@ -2176,7 +2176,7 @@ namespace AllInOneMod_m0n0t0ny
                 AddToggle(L("Close on Shift"), _autoCloseOnShift, v => { _autoCloseOnShift = v; PlayerPrefs.SetInt(PREF_AC_SHIFT, v ? 1 : 0); PlayerPrefs.Save(); });
                 AddToggle(L("Close on Space"), _autoCloseOnSpace, v => { _autoCloseOnSpace = v; PlayerPrefs.SetInt(PREF_AC_SPACE, v ? 1 : 0); PlayerPrefs.Save(); });
                 AddToggle(L("Close on damage"), _autoCloseOnDamage, v => { _autoCloseOnDamage = v; PlayerPrefs.SetInt(PREF_AC_DAMAGE, v ? 1 : 0); PlayerPrefs.Save(); });
-                AddToggle(L("Wake-up preset buttons"), _sleepPresetsEnabled, v => { _sleepPresetsEnabled = v; PlayerPrefs.SetInt(PREF_SLEEP_ENABLED, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Wake-up presets"), _sleepPresetsEnabled, v => { _sleepPresetsEnabled = v; PlayerPrefs.SetInt(PREF_SLEEP_ENABLED, v ? 1 : 0); PlayerPrefs.Save(); });
                 var timeSlots = Enumerable.Range(0, 96).Select(i => $"{i / 4:D2}:{(i % 4) * 15:D2}").ToArray();
                 AddCycle(L("Preset 1"), timeSlots, _preset1Hour * 4 + _preset1Min / 15, idx =>
                 {
@@ -2207,7 +2207,7 @@ namespace AllInOneMod_m0n0t0ny
             // ── HUD ───────────────────────────────────────────────────────────
             AddSection(L("HUD"), () =>
             {
-                AddToggle(L("Show FPS counter"), _showFps, v =>
+                AddToggle(L("FPS counter"), _showFps, v =>
                 {
                     _showFps = v; PlayerPrefs.SetInt(PREF_FPS_COUNTER, v ? 1 : 0); PlayerPrefs.Save();
                     if (_fpsCanvas != null) _fpsCanvas.SetActive(v);
