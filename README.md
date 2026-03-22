@@ -1,6 +1,6 @@
 # ALL IN ONE - m0n0t0ny's mod
 
-All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all configurable from the native **Options** menu.
+All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all configurable from the native **Settings** menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -11,7 +11,7 @@ All-in-one quality of life mod for **Escape from Duckov**. 15 independent featur
 
 ## Features
 
-All settings are persisted and configurable from the **ALL IN ONE** tab in the game's Options menu - accessible both from the main menu and the in-game pause menu.
+All settings are persisted and configurable from the **ALL IN ONE** tab in the game's Settings menu - accessible both from the main menu and the in-game pause menu.
 
 ![Options menu](assets/f9-menu.png)
 
