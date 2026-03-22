@@ -1,6 +1,6 @@
-# All In One - m0n0t0ny's Mod
+# ALL IN ONE - m0n0t0ny's mod
 
-All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all toggleable from the **F9** settings menu.
+All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all configurable from the native **Options** menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -11,32 +11,32 @@ All-in-one quality of life mod for **Escape from Duckov**. 15 independent featur
 
 ## Features
 
-All settings are persisted and configurable from the **F9** panel in-game.
+All settings are persisted and configurable from the **ALL IN ONE** tab in the game's Options menu - accessible both from the main menu and the in-game pause menu.
 
-![F9 Menu](assets/f9-menu.png)
+![Options menu](assets/f9-menu.png)
 
 ---
 
 ### 🎒 Looting
 
-#### Item sell value on hover
-Shows the sell price of any item at any time, not just in shops. Choose between single, stack total, or combined display.
+#### Show item value on hover
+Shows the sell price of any item at any time, not just in shops. Choose between combined, single, stack, or off.
 
 ![Item sell value](assets/item-sell-value.png)
 
-#### Item transfer
-Modifier+click (Shift or Alt) to instantly move items between an open container and your backpack.
+#### Quick item transfer
+Alt+click or Shift+click to instantly move items between an open container and your backpack, and vice versa.
 
-#### Auto-unload on loot
-When you open a dead enemy's loot, their gun is automatically unloaded - ammo and magazines go directly into the stash, ready to grab.
+#### Auto-unload gun on kill
+When you loot a killed enemy, their weapon is automatically unloaded - ammo goes directly into the stash as a lootable stack, ready to grab.
 
-#### Recorded items badge
+#### Badge on recorded keys and Blueprints
 A green checkmark on keys and blueprints you have already recorded, so you know at a glance what to keep and what to sell.
 
 ![Recorded items badge](assets/recorded-items-badge.png)
 
 #### Lootbox highlight
-Gold outline on loot containers in the world so you never miss one. Optional "only unsearched" mode hides the outline on already-opened containers.
+Gold outline on loot containers in the world so you never miss one. Three modes: All / Only unsearched / Off.
 
 ![Lootbox highlight](assets/lootbox-highlight.png)
 
@@ -44,7 +44,7 @@ Gold outline on loot containers in the world so you never miss one. Optional "on
 
 ### ⚔️ Combat
 
-#### Enemy names
+#### Show enemy name
 Displays the enemy name above their health bar.
 
 ![Enemy names](assets/enemy-names.png)
@@ -59,7 +59,7 @@ Scroll wheel skips the melee slot when cycling weapons. Melee can still be equip
 
 ### 🌙 Survival
 
-#### Sleep presets
+#### Wake-up presets
 Wake-up preset buttons on the sleep screen: 4 custom configurable times, plus rain, Storm I, Storm II, and Storm end.
 
 ![Sleep presets](assets/sleep-presets.png)
@@ -80,18 +80,18 @@ Hides the native Controls [O] button and its submenu to reduce HUD clutter.
 ![Hide controls hint](assets/hide-controls-hint.png)
 
 #### Hide HUD on ADS
-Hides the entire HUD while holding right-click for a cleaner, more immersive aiming experience. Health bars and crosshair always remain visible. A sub-toggle lets you keep the ammo counter visible if preferred. OFF by default.
+Hides the HUD while holding right-click for a cleaner, more immersive aiming experience. Three modes: Hide all / Show only ammo / Off. Health bars and crosshair always remain visible.
 
 ![Hide HUD on ADS](assets/hide-hud-on-ads.png)
 
-#### Camera view persistence
+#### Remember camera view
 Remembers your camera preference (top-down or default) between sessions, and restores it automatically on load.
 
 ---
 
 ### ⭐ Quests
 
-#### Quest favorites
+#### Quest favorites (N key)
 Press N on a selected quest to pin it to the top of the list. Pinned quests are always visible regardless of filters.
 
 ![Quest favorites](assets/quest-favorites.png)

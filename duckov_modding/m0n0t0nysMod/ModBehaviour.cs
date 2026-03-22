@@ -15,6 +15,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using Duckov.Options.UI;
 
 namespace AllInOneMod_m0n0t0ny
 {
@@ -26,7 +27,6 @@ namespace AllInOneMod_m0n0t0ny
         // ── PlayerPrefs keys ──────────────────────────────────────────────
         private const string PREF_ENABLED = "DisplayItemValue_Enabled";
         private const string PREF_MODE = "DisplayItemValue_Mode";
-        private const string PREF_SELL_COMBO = "DisplayItemValue_SellCombo";
         private const string PREF_SLEEP_ENABLED = "DisplayItemValue_SleepEnabled";
         private const string PREF_PRESET1H = "DisplayItemValue_Preset1H";
         private const string PREF_PRESET1M = "DisplayItemValue_Preset1M";
@@ -39,15 +39,12 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_ENEMY_NAMES = "DisplayItemValue_EnemyNames";
         private const string PREF_TRANSFER_ENABLED = "DisplayItemValue_TransferEnabled";
         private const string PREF_TRANSFER_MOD = "DisplayItemValue_TransferMod";
-        private const string PREF_TRANSFER_COMBO = "DisplayItemValue_TransferCombo";
         private const string PREF_AC_WASD = "DisplayItemValue_ACWasd";
         private const string PREF_AC_SHIFT = "DisplayItemValue_ACShift";
         private const string PREF_AC_SPACE = "DisplayItemValue_ACSpace";
         private const string PREF_AC_DAMAGE = "DisplayItemValue_ACDamage";
         private const string PREF_FPS_COUNTER = "DisplayItemValue_FpsCounter";
         private const string PREF_SKIP_MELEE = "DisplayItemValue_SkipMelee";
-        private const KeyCode MENU_KEY = KeyCode.F9;
-        private const string MC_MOD_NAME = "All In One - m0n0t0ny's Mod";
 
         // ── Item value display ────────────────────────────────────────────
         private bool _showValue;
@@ -59,11 +56,6 @@ namespace AllInOneMod_m0n0t0ny
         private bool _transferEnabled;
         private TransferModifier _transferModifier;
         private Item? _transferCachedItem; // snapshotted at end of each frame via LateUpdate
-        private Image? _transferToggleImage;
-        private RectTransform? _transferToggleThumb;
-        private Image[]? _transferModBtnImages;
-        private TextMeshProUGUI[]? _transferModBtnLabels;
-        private GameObject? _shiftConflictWarning;
         private static readonly FieldInfo? _lootCharInvField =
             typeof(LootView).GetField("characterInventoryDisplay", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly FieldInfo? _lootTargetInvField =
@@ -76,8 +68,6 @@ namespace AllInOneMod_m0n0t0ny
         private bool _autoCloseOnShift;
         private bool _autoCloseOnSpace;
         private bool _autoCloseOnDamage;
-        private Image[]? _autoCloseBtnImages;
-        private RectTransform[]? _autoCloseBtnThumbs;
         private Component? _playerHealthComp;
         private PropertyInfo? _playerHealthValueProp;
         private float _playerHealthPrev = float.MaxValue;
@@ -100,17 +90,18 @@ namespace AllInOneMod_m0n0t0ny
                 .GetField("characterPreset", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
                 ?.FieldType.GetProperty("DisplayName", BindingFlags.Public | BindingFlags.Instance);
 
-        // ── Settings panel UI refs ────────────────────────────────────────
-        private GameObject? _settingsCanvas;
-        private Canvas? _settingsCanvasComp;
-        private Image? _toggleBtnImage;
-        private RectTransform? _toggleBtnThumb;
-        private Image[]? _modeBtnImages;
-        private TextMeshProUGUI[]? _modeBtnLabels;
-        private Image? _enemyNamesToggleImage;
-        private RectTransform? _enemyNamesToggleThumb;
-        private Image? _sleepToggleImage;
-        private RectTransform? _sleepToggleThumb;
+        // ── Native settings tab injection ─────────────────────────────────
+        private static FieldInfo? _optTabButtonsField;
+        private static FieldInfo? _optTabContentField;
+        private static MethodInfo? _optSetupMethod;
+        private static bool _optReflectionSearched;
+        private bool _ddolTabInited;
+        private bool _mmTabInited;
+        private float _tabInjectTimer;
+        private GameObject? _ddolTabContent;
+        private GameObject? _mmTabContent;
+        private SystemLanguage _tabBuiltLang;
+        private float _langCheckTimer;
 
         // ── Sleep preset state ────────────────────────────────────────────
         private bool _sleepPresetsEnabled;
@@ -132,42 +123,29 @@ namespace AllInOneMod_m0n0t0ny
         private float _fpsDeltaAccum;
         private int _fpsFrameCount;
         private float _fpsValue;
-        private Image? _fpsToggleImage;
-        private RectTransform? _fpsToggleThumb;
 
         // ── Skip melee on scroll ──────────────────────────────────────────
         private bool _skipMeleeOnScroll;
         private bool _scrollDetectedThisFrame;
         private int _lastScrollDir;
-        private Image? _skipMeleeToggleImage;
-        private RectTransform? _skipMeleeToggleThumb;
         private CharacterMainControl? _playerCtrl;
 
         // ── Auto-unload enemy weapons on loot-open ────────────────────────
         private const string PREF_AUTO_UNLOAD = "DisplayItemValue_AutoUnload";
         private bool _autoUnloadEnabled;
-        private Image? _autoUnloadToggleImage;
-        private RectTransform? _autoUnloadToggleThumb;
         private int _lastAutoUnloadInvId;
         private static PropertyInfo? _itemPlugsProp;
         private static FieldInfo? _itemPlugsField;
         private static bool _itemPlugsSearched;
         private static PropertyInfo? _stackCountProp;
+        private static PropertyInfo? _maxStackCountProp;
+        private static PropertyInfo? _typeIDProp;
         private static bool _stackCountSearched;
 
-        // ── ModConfig integration (optional) ─────────────────────────────
-        private static Type? _mcAPI;
-        private bool _mcChecked;
-        private bool _mcDelegateRegistered;
-        private bool _mcSavedRegistered;
-        private Action<string>? _mcDelegate;
-        private int _mcPollFrame;
 
         // ── Factory Recorder badge ────────────────────────────────────────
         private const string PREF_RECORDER_BADGE = "DisplayItemValue_RecorderBadge";
         private bool _showRecorderBadge;
-        private Image? _recorderToggleImage;
-        private RectTransform? _recorderToggleThumb;
         // ItemUtilities.IsRegistered(Item) → bool  (static helper used by the game)
         private static MethodInfo? _isRegisteredMethod;
         // Slot badge overlay tracking
@@ -182,10 +160,6 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_LOOTBOX_HL_UNSEARCHED = "DisplayItemValue_LootboxHLUnsearched";
         private bool _lootboxHLEnabled;
         private bool _lootboxHLOnlyUnsearched;
-        private Image? _lootboxHLToggleImage;
-        private RectTransform? _lootboxHLToggleThumb;
-        private Image? _lootboxHLUnsearchedToggleImage;
-        private RectTransform? _lootboxHLUnsearchedToggleThumb;
         // key = GameObject instanceID
         private readonly Dictionary<int, Outlinable> _lootboxOutlines = new Dictionary<int, Outlinable>();
         private float _lootboxScanTimer;
@@ -202,8 +176,6 @@ namespace AllInOneMod_m0n0t0ny
         private bool _questFavEnabled;
         private readonly HashSet<int> _favoriteQuestIds = new HashSet<int>();
         private float _questFavReorderTimer;
-        private Image? _questFavToggleImage;
-        private RectTransform? _questFavToggleThumb;
         private static readonly FieldInfo? _qvActiveEntriesField =
             typeof(QuestView).GetField("activeEntries", BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -214,24 +186,13 @@ namespace AllInOneMod_m0n0t0ny
         private const string PREF_HIDE_HUD_ADS = "DisplayItemValue_HideHudOnAds";
         private const string PREF_HIDE_AMMO_ADS = "DisplayItemValue_HideAmmoOnAds";
         private bool _killFeedEnabled;
-        private Image? _killFeedToggleImage;
-        private RectTransform? _killFeedToggleThumb;
         private bool _hideCtrlHint;
-        private Image? _hideCtrlToggleImage;
-        private RectTransform? _hideCtrlToggleThumb;
         private bool _hideHudOnAds;
         private bool _hideAmmoOnAds;
         private bool _adsHiding;
         private readonly List<CanvasGroup> _adsHideGroups = new List<CanvasGroup>();
         private readonly List<(CanvasGroup cg, float alpha, bool rays)> _adsSnapshot = new List<(CanvasGroup, float, bool)>();
-        private Transform? _aimMarkerTransform;
-        private Image? _hideHudAdsToggleImage;
-        private RectTransform? _hideHudAdsToggleThumb;
-        private Image? _hideAmmoAdsToggleImage;
-        private RectTransform? _hideAmmoAdsToggleThumb;
         private bool _cameraViewPersist;
-        private Image? _cameraViewToggleImage;
-        private RectTransform? _cameraViewToggleThumb;
         private bool _savedTopDown;
         private bool _viewRestorePending;
         private static readonly FieldInfo? _topDownViewField =
@@ -268,7 +229,6 @@ namespace AllInOneMod_m0n0t0ny
         {
             _showValue = PlayerPrefs.GetInt(PREF_ENABLED, 1) == 1;
             _mode = (DisplayMode)PlayerPrefs.GetInt(PREF_MODE, (int)DisplayMode.Combined);
-            if (!PlayerPrefs.HasKey(PREF_SELL_COMBO)) SaveSellComboPrefs();
             _showEnemyNames = PlayerPrefs.GetInt(PREF_ENEMY_NAMES, 1) == 1;
             _transferEnabled = PlayerPrefs.GetInt(PREF_TRANSFER_ENABLED, 1) == 1;
             _transferModifier = (TransferModifier)PlayerPrefs.GetInt(PREF_TRANSFER_MOD, (int)TransferModifier.Shift);
@@ -278,13 +238,13 @@ namespace AllInOneMod_m0n0t0ny
             _autoCloseOnDamage = PlayerPrefs.GetInt(PREF_AC_DAMAGE, 0) == 1;
             _sleepPresetsEnabled = PlayerPrefs.GetInt(PREF_SLEEP_ENABLED, 1) == 1;
             _preset1Hour = PlayerPrefs.GetInt(PREF_PRESET1H, 5);
-            _preset1Min = PlayerPrefs.GetInt(PREF_PRESET1M, 30);
-            _preset2Hour = PlayerPrefs.GetInt(PREF_PRESET2H, 21);
-            _preset2Min = PlayerPrefs.GetInt(PREF_PRESET2M, 30);
-            _preset3Hour = PlayerPrefs.GetInt(PREF_PRESET3H, 8);
-            _preset3Min = PlayerPrefs.GetInt(PREF_PRESET3M, 0);
-            _preset4Hour = PlayerPrefs.GetInt(PREF_PRESET4H, 12);
-            _preset4Min = PlayerPrefs.GetInt(PREF_PRESET4M, 0);
+            _preset1Min = PlayerPrefs.GetInt(PREF_PRESET1M, 45);
+            _preset2Hour = PlayerPrefs.GetInt(PREF_PRESET2H, 11);
+            _preset2Min = PlayerPrefs.GetInt(PREF_PRESET2M, 45);
+            _preset3Hour = PlayerPrefs.GetInt(PREF_PRESET3H, 17);
+            _preset3Min = PlayerPrefs.GetInt(PREF_PRESET3M, 45);
+            _preset4Hour = PlayerPrefs.GetInt(PREF_PRESET4H, 23);
+            _preset4Min = PlayerPrefs.GetInt(PREF_PRESET4M, 45);
             _showRecorderBadge = PlayerPrefs.GetInt(PREF_RECORDER_BADGE, 1) == 1;
             _showFps = PlayerPrefs.GetInt(PREF_FPS_COUNTER, 0) == 1;
             _skipMeleeOnScroll = PlayerPrefs.GetInt(PREF_SKIP_MELEE, 1) == 1;
@@ -302,75 +262,11 @@ namespace AllInOneMod_m0n0t0ny
                 if (int.TryParse(s.Trim(), out int qid) && qid != 0) _favoriteQuestIds.Add(qid);
             CacheRecorderReflection();
             EnsureLootboxTypes();
-            BuildSettingsPanel();
-            TryInitModConfig();
-        }
-
-        private CursorLockMode _prevLockMode;
-        private bool _prevCursorVisible;
-        private bool _menuOpen;
-        private static readonly Type? _inputControlType =
-            AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
-                .FirstOrDefault(t => t.Name == "CharacterInputControl");
-        private readonly List<Behaviour> _disabledInputControls = new List<Behaviour>();
-
-        private void SetMenuVisible(bool open)
-        {
-            _menuOpen = open;
-            _settingsCanvas!.SetActive(open);
-            if (_settingsCanvasComp != null) _settingsCanvasComp.enabled = open;
-
-            if (open)
-            {
-                _prevLockMode = Cursor.lockState;
-                _prevCursorVisible = Cursor.visible;
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-
-                _disabledInputControls.Clear();
-                if (_inputControlType != null)
-                {
-                    foreach (UnityEngine.Object obj in FindObjectsOfType(_inputControlType))
-                    {
-                        if (obj is Behaviour b && b.enabled)
-                        {
-                            b.enabled = false;
-                            _disabledInputControls.Add(b);
-                        }
-                    }
-                }
-            }
-            else
-            {
-                Cursor.lockState = _prevLockMode;
-                Cursor.visible = _prevCursorVisible;
-
-                foreach (var b in _disabledInputControls)
-                    if (b != null) b.enabled = true;
-                _disabledInputControls.Clear();
-
-                // Sync F9 changes to ModConfig on panel close
-                SyncAllToModConfig();
-            }
         }
 
         void OnDestroy()
         {
-            if (_mcDelegate != null && _mcAPI != null)
-            {
-                try
-                {
-                    var rm = _mcAPI.GetMethod("SafeRemoveOnOptionsChangedDelegate",
-                        BindingFlags.Public | BindingFlags.Static, null,
-                        new[] { typeof(Action<string>) }, null);
-                    rm?.Invoke(null, new object[] { _mcDelegate });
-                }
-                catch { }
-                _mcDelegate = null;
-            }
             if (_valueText != null) Destroy(_valueText.gameObject);
-            if (_settingsCanvas != null) Destroy(_settingsCanvas);
             if (_fpsCanvas != null) Destroy(_fpsCanvas);
             if (_killFeedCanvas != null) Destroy(_killFeedCanvas);
             ClearLootboxOutlines();
@@ -434,26 +330,54 @@ namespace AllInOneMod_m0n0t0ny
             ClearKillFeedSubscriptions();
             _simpleIndicators = null;
             _adsHideGroups.Clear();
-            _aimMarkerTransform = null;
             _simpleIndicatorsFound = false;
+            _simpleIndicatorSearchTimer = 0f;
             _adsHiding = false;
             _viewRestorePending = true;
+            _mmTabInited = false;
+            _mmTabContent = null;
+            _playerCtrl = null;
         }
 
         private Transform? _simpleIndicators;
         private bool _simpleIndicatorsFound;
+        private float _simpleIndicatorSearchTimer;
         void Update()
         {
-            if (!_mcChecked) TryInitModConfig();
-            if (_mcChecked && _mcAPI != null && !_menuOpen)
+            // Only poll for tab injection when needed and in the right context.
+            // - DDOL tab: inject once; flag is never reset on scene load (panel persists).
+            // - MM tab: only attempt when not in a raid (LevelManager is null in menus).
+            if (!_ddolTabInited || (!_mmTabInited && LevelManager.Instance == null))
             {
-                if (++_mcPollFrame >= 60) { _mcPollFrame = 0; OnModConfigSaved(); }
+                _tabInjectTimer -= Time.unscaledDeltaTime;
+                if (_tabInjectTimer <= 0f)
+                {
+                    _tabInjectTimer = 0.5f;
+                    TryInjectSettingsTab();
+                }
             }
-            var curLang = GetGameLanguage();
-            if (_lastLang != SystemLanguage.Unknown && curLang != _lastLang)
-                RebuildSettingsPanel();
+            // Language change detection: rebuild settings tab content when the game language changes.
+            if (_ddolTabContent != null)
+            {
+                _langCheckTimer -= Time.unscaledDeltaTime;
+                if (_langCheckTimer <= 0f)
+                {
+                    _langCheckTimer = 0.5f;
+                    var currentLang = GetGameLanguage();
+                    if (currentLang != _tabBuiltLang)
+                    {
+                        _tabBuiltLang = currentLang;
+                        RefreshTabContent(_ddolTabContent);
+                        if (_mmTabContent != null) RefreshTabContent(_mmTabContent);
+                    }
+                }
+            }
             if (!_simpleIndicatorsFound && LevelManager.Instance != null)
             {
+                // Throttle to avoid calling FindObjectsOfType<Canvas> every frame
+                _simpleIndicatorSearchTimer -= Time.deltaTime;
+                if (_simpleIndicatorSearchTimer > 0f) goto _skipHudSearch;
+                _simpleIndicatorSearchTimer = 0.5f;
                 foreach (var c in UnityEngine.Object.FindObjectsOfType<Canvas>())
                 {
                     if (c.gameObject.name != "HUDCanvas") continue;
@@ -468,7 +392,7 @@ namespace AllInOneMod_m0n0t0ny
                         var n = t.name;
                         if (n.IndexOf("CrossHair", StringComparison.OrdinalIgnoreCase) >= 0 ||
                             n.IndexOf("AimMarker", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                            n.IndexOf("Reticle",   StringComparison.OrdinalIgnoreCase) >= 0)
+                            n.IndexOf("Reticle", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
                             var cur = t;
                             while (cur.parent != null && cur.parent != c.transform)
@@ -493,18 +417,17 @@ namespace AllInOneMod_m0n0t0ny
                               ?? child.gameObject.AddComponent<CanvasGroup>();
                         _adsHideGroups.Add(cg);
                     }
-                    // Store AimMarker reference for optional ammo hiding during ADS
-                    _aimMarkerTransform = c.transform.Find("AimMarker");
                     _simpleIndicatorsFound = true;
                     break;
                 }
             }
+        _skipHudSearch:;
             // Keep enforcing: if hide is on and the game re-enabled it, hide it again
             if (_hideCtrlHint && _simpleIndicators != null && _simpleIndicators.gameObject.activeSelf)
                 _simpleIndicators.gameObject.SetActive(false);
 
             // Hide HUD on ADS (right mouse button) - CanvasGroup.alpha avoids SetActive spikes
-            if (_hideHudOnAds && _simpleIndicatorsFound && _adsHideGroups.Count > 0 && !_menuOpen)
+            if (_hideHudOnAds && _simpleIndicatorsFound && _adsHideGroups.Count > 0)
             {
                 bool ads = Input.GetMouseButton(1);
                 if (ads && !_adsHiding)
@@ -555,19 +478,6 @@ namespace AllInOneMod_m0n0t0ny
                 }
             }
 
-            // If the game externally hides our canvas (SetActive or Canvas.enabled), restore it
-            if (_menuOpen && _settingsCanvas != null)
-            {
-                if (!_settingsCanvas.activeSelf) _settingsCanvas.SetActive(true);
-                if (_settingsCanvasComp != null && !_settingsCanvasComp.enabled) _settingsCanvasComp.enabled = true;
-            }
-
-            if (_settingsCanvas != null && _settingsCanvas.activeSelf)
-            {
-                if (Cursor.lockState != CursorLockMode.None) Cursor.lockState = CursorLockMode.None;
-                if (!Cursor.visible) Cursor.visible = true;
-            }
-
             _scrollDetectedThisFrame = false;
             if (_skipMeleeOnScroll)
             {
@@ -578,9 +488,6 @@ namespace AllInOneMod_m0n0t0ny
                     _lastScrollDir = scroll > 0f ? 1 : -1;
                 }
             }
-
-            if (Input.GetKeyDown(MENU_KEY))
-                SetMenuVisible(!_menuOpen);
 
             if (_questFavEnabled && Input.GetKeyDown(KeyCode.N))
                 TryToggleQuestFavorite();
@@ -763,30 +670,64 @@ namespace AllInOneMod_m0n0t0ny
         }
 
         // Merges plug into an existing same-type stack in the inventory.
-        // Returns true if merged (plug is consumed); false if AddItem should be called instead.
+        // Returns true if plug is fully merged (caller must NOT call AddItem).
+        // Returns false if plug could not be merged or has leftover - caller should call AddItem.
         private static bool TryMergeStack(Item plug, Inventory inv)
         {
             if (!_stackCountSearched)
             {
                 _stackCountSearched = true;
-                var p = typeof(Item).GetProperty("StackCount", BindingFlags.Public | BindingFlags.Instance);
-                if (p != null && p.CanWrite) _stackCountProp = p;
+                var t = typeof(Item);
+                var sc = t.GetProperty("StackCount", BindingFlags.Public | BindingFlags.Instance);
+                if (sc != null && sc.CanWrite) _stackCountProp = sc;
+                _maxStackCountProp = t.GetProperty("MaxStackCount", BindingFlags.Public | BindingFlags.Instance);
+                _typeIDProp = t.GetProperty("TypeID", BindingFlags.Public | BindingFlags.Instance);
             }
-            if (_stackCountProp == null) return false;
+            if (_stackCountProp == null || _maxStackCountProp == null) return false;
+
+            // Only stackable items (MaxStackCount > 1) should ever merge.
+            int maxStack;
+            try { maxStack = (int)(_maxStackCountProp.GetValue(plug) ?? 1); }
+            catch { return false; }
+            if (maxStack <= 1) return false;
 
             int plugCount;
             try { plugCount = (int)(_stackCountProp.GetValue(plug) ?? 0); }
             catch { return false; }
             if (plugCount <= 0) return false;
 
-            var target = inv.Content?.FirstOrDefault(i => i != null && i != plug && i.GetType() == plug.GetType());
+            // Find a slot of the same type with room, using TypeID when available.
+            object? plugID = null;
+            try { plugID = _typeIDProp?.GetValue(plug); } catch { }
+
+            Item? target = null;
+            if (inv.Content != null)
+            {
+                foreach (var candidate in inv.Content)
+                {
+                    if (candidate == null || candidate == plug) continue;
+                    bool sameType = plugID != null
+                        ? plugID.Equals(_typeIDProp!.GetValue(candidate))
+                        : candidate.GetType() == plug.GetType();
+                    if (!sameType) continue;
+                    int cMax, cCount;
+                    try { cMax = (int)(_maxStackCountProp.GetValue(candidate) ?? 1); } catch { continue; }
+                    try { cCount = (int)(_stackCountProp.GetValue(candidate) ?? 0); } catch { continue; }
+                    if (cCount < cMax) { target = candidate; break; }
+                }
+            }
             if (target == null) return false;
 
             try
             {
                 int existingCount = (int)(_stackCountProp.GetValue(target) ?? 0);
-                _stackCountProp.SetValue(target, existingCount + plugCount);
-                return true;
+                int targetMax = (int)(_maxStackCountProp.GetValue(target) ?? maxStack);
+                int canFit = targetMax - existingCount;
+                int moved = Math.Min(plugCount, canFit);
+                _stackCountProp.SetValue(target, existingCount + moved);
+                if (moved >= plugCount) return true;          // fully merged
+                _stackCountProp.SetValue(plug, plugCount - moved); // update remainder
+                return false;                                  // partial - caller does AddItem
             }
             catch { return false; }
         }
@@ -993,13 +934,13 @@ namespace AllInOneMod_m0n0t0ny
             if (lootInv != null && lootInv.Content.Contains(item) && charInv != null)
             {
                 lootInv.RemoveItem(item);
-                if (!charInv.AddItem(item))
+                if (!TryMergeStack(item, charInv) && !charInv.AddItem(item))
                     lootInv.AddItem(item);
             }
             else if (charInv != null && charInv.Content.Contains(item) && lootInv != null)
             {
                 charInv.RemoveItem(item);
-                if (!lootInv.AddItem(item))
+                if (!TryMergeStack(item, lootInv) && !lootInv.AddItem(item))
                     charInv.AddItem(item);
             }
         }
@@ -1590,35 +1531,10 @@ namespace AllInOneMod_m0n0t0ny
             return _roundedRectSprite;
         }
 
-        // Pill sprite for toggle track - 192×96 with r=48 (= h/2), 9-sliced
-        // Borders 48+48=96 == target height 96 → zero vertical distortion
-        private static Sprite? _pillSprite;
-        private static Sprite GetOrCreatePillSprite()
-        {
-            if (_pillSprite != null) return _pillSprite;
-            const int w = 192, h = 96;
-            const float r = 48f; // = h/2 → pure pill
-            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
-            tex.filterMode = FilterMode.Bilinear;
-            for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    float cx = Mathf.Clamp(x + 0.5f, r, w - r);
-                    float cy = Mathf.Clamp(y + 0.5f, r, h - r);
-                    float dx = (x + 0.5f) - cx, dy = (y + 0.5f) - cy;
-                    tex.SetPixel(x, y, dx * dx + dy * dy <= r * r ? Color.white : Color.clear);
-                }
-            tex.Apply();
-            _pillSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f),
-                400f, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
-            return _pillSprite;
-        }
-
         // ── Localization ──────────────────────────────────────────────────
 
         private static PropertyInfo? _locLangProp;
         private static bool _locInit;
-        private SystemLanguage _lastLang = SystemLanguage.Unknown;
 
         private static SystemLanguage GetGameLanguage()
         {
@@ -1650,98 +1566,45 @@ namespace AllInOneMod_m0n0t0ny
 
         private static readonly Dictionary<string, string[]> _t = new Dictionary<string, string[]>
         {
-            // Card titles
-            ["Item Value"] = new[] { "Valeur d'objet", "Gegenstandswert", "物品价值", "物品價值", "アイテム価格", "아이템 가치", "Valor do Item", "Стоимость предмета", "Valor del objeto" },
-            ["Enemies"] = new[] { "Ennemis", "Feinde", "敌人", "敵人", "敵", "적", "Inimigos", "Враги", "Enemigos" },
-            ["Item Transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de Item", "Перенос предметов", "Transferencia de objetos" },
-            ["Auto-Close Container"] = new[] { "Fermeture auto conteneur", "Container autom. schließen", "自动关闭容器", "自動關閉容器", "コンテナ自動閉鎖", "컨테이너 자동 닫기", "Fechar Contêiner Auto", "Авто-закрытие контейнера", "Cerrar contenedor auto" },
-            ["Weapons"] = new[] { "Armes", "Waffen", "武器", "武器", "武器", "무기", "Armas", "Оружие", "Armas" },
-            ["Lootbox Highlight"] = new[] { "Surlignage des conteneurs", "Container-Hervorhebung", "战利品箱高亮", "戰利品箱高亮", "ルートボックス強調", "루트박스 강조", "Destaque de Caixas", "Подсветка контейнеров", "Resaltar cajas de botín" },
+            // Section headers
+            ["Looting"] = new[] { "Pillage", "Plündern", "拾取", "拾取", "ルーティング", "루팅", "Saque", "Мародёрство", "Saqueo" },
+            ["Combat"] = new[] { "Combat", "Kampf", "战斗", "戰鬥", "戦闘", "전투", "Combate", "Бой", "Combate" },
+            ["Survival"] = new[] { "Survie", "Überleben", "生存", "生存", "サバイバル", "생존", "Sobrevivência", "Выживание", "Supervivencia" },
+            ["HUD"] = new[] { "HUD", "HUD", "界面", "介面", "HUD", "HUD", "HUD", "Интерфейс", "HUD" },
             ["Quests"] = new[] { "Quêtes", "Aufgaben", "任务", "任務", "クエスト", "퀘스트", "Missões", "Задания", "Misiones" },
-            ["Recorded Items"] = new[] { "Objets enregistrés", "Erfasste Gegenstände", "已记录物品", "已記錄物品", "記録済みアイテム", "기록된 아이템", "Itens Registrados", "Записанные предметы", "Objetos registrados" },
-            ["FPS Counter"] = new[] { "Compteur FPS", "FPS-Anzeige", "帧率显示", "幀率顯示", "FPS表示", "FPS 카운터", "Contador FPS", "Счётчик FPS", "Contador FPS" },
-            ["Sleep Presets"] = new[] { "Préréglages de sommeil", "Schlaf-Voreinstellungen", "睡眠预设", "睡眠預設", "睡眠プリセット", "수면 프리셋", "Predefinições de Sono", "Пресеты сна", "Preajustes de sueño" },
-            // Toggle labels
-            ["Show sell value on hover"] = new[] { "Afficher la valeur de vente", "Verkaufswert anzeigen", "悬停显示售价", "懸停顯示售價", "売値をホバー表示", "호버 시 판매가 표시", "Mostrar valor de venda", "Показывать цену продажи", "Mostrar valor de venta" },
-            ["Show enemy names"] = new[] { "Afficher les noms ennemis", "Feindnamen anzeigen", "显示敌人名称", "顯示敵人名稱", "敵の名前を表示", "적 이름 표시", "Mostrar nomes inimigos", "Показывать имена врагов", "Mostrar nombres enemigos" },
+            // Dropdown values
+            ["Off"] = new[] { "Off", "Aus", "关闭", "關閉", "オフ", "끔", "Desligado", "Выкл.", "Apagado" },
+            ["On"] = new[] { "On", "An", "开启", "開啟", "オン", "켬", "Ligado", "Вкл.", "Activado" },
+            ["Combined"] = new[] { "Combiné", "Kombiniert", "组合", "組合", "複合", "복합", "Combinado", "Комбинированный", "Combinado" },
+            ["Single"] = new[] { "Unité", "Einzeln", "单个", "單個", "単体", "단일", "Unitário", "Единица", "Unidad" },
+            ["Stack"] = new[] { "Pile", "Stapel", "堆叠", "堆疊", "スタック", "스택", "Pilha", "Стопка", "Pila" },
+            ["All"] = new[] { "Tous", "Alle", "全部", "全部", "全て", "전체", "Todos", "Все", "Todos" },
+            ["Only unsearched"] = new[] { "Seulement non fouillés", "Nur Ungesucht", "仅未搜寻", "僅未搜尋", "未探索のみ", "미수색만", "Apenas não vasculhados", "Только необысканные", "Solo sin registrar" },
+            ["Hide all"] = new[] { "Tout masquer", "Alles ausblenden", "隐藏全部", "隱藏全部", "全て非表示", "모두 숨기기", "Ocultar tudo", "Скрыть всё", "Ocultar todo" },
+            ["Show Only Ammo"] = new[] { "Afficher seulement munitions", "Nur Munition anzeigen", "仅显示弹药", "僅顯示彈藥", "弾薬のみ表示", "탄약만 표시", "Mostrar só munição", "Только патроны", "Solo munición" },
+            // Feature labels
+            ["Show item value on hover"] = new[] { "Afficher la valeur de l'objet", "Artikelwert beim Hover", "悬停显示物品价值", "懸停顯示物品價值", "ホバー時に価値を表示", "호버 시 아이템 가치 표시", "Mostrar valor do item", "Стоимость при наведении", "Mostrar valor al pasar" },
+            ["Quick item transfer"] = new[] { "Transfert rapide", "Schnelltransfer", "快速转移物品", "快速轉移物品", "クイックアイテム移動", "빠른 아이템 이동", "Transferir item rapidamente", "Быстрый перенос", "Transferencia rápida" },
+            ["Lootbox highlight"] = new[] { "Surligner les caisses", "Loot-Kisten hervorheben", "高亮战利品箱", "高亮戰利品箱", "ルートボックス強調", "루트박스 강조", "Destacar caixas de loot", "Подсветка контейнеров", "Resaltar cajas de botín" },
+            ["Badge on recorded keys and Blueprints"] = new[] { "Badge sur clés/plans enregistrés", "Badge erfasste Schlüssel/Pläne", "已记录钥匙和蓝图徽章", "已記錄鑰匙和藍圖徽章", "記録済みキー/設計図バッジ", "기록된 열쇠/청사진 뱃지", "Badge em chaves/plantas registradas", "Значок записанных ключей/схем", "Insignia en llaves/planos registrados" },
+            ["Show enemy name"] = new[] { "Afficher le nom ennemi", "Feindnamen anzeigen", "显示敌人名称", "顯示敵人名稱", "敵の名前を表示", "적 이름 표시", "Mostrar nome inimigo", "Показывать имя врага", "Mostrar nombre enemigo" },
             ["Auto-unload gun on kill"] = new[] { "Décharger arme à la mort", "Waffe bei Tod entladen", "击杀时自动卸弹", "擊殺時自動卸彈", "キル時に自動アンロード", "처치 시 총알 제거", "Descarregar arma ao matar", "Авто-разрядка при убийстве", "Descargar arma al matar" },
             ["Kill feed"] = new[] { "Fil de mort", "Kill-Feed", "击杀信息流", "擊殺信息流", "キルフィード", "킬 피드", "Feed de abates", "Лента убийств", "Feed de bajas" },
-            ["Modifier + click to transfer"] = new[] { "Modificateur + clic", "Modifiziertaste + Klick", "修饰键+点击转移", "修飾鍵+點擊轉移", "修飾キー+クリック移動", "수정키+클릭으로 이동", "Modificador + clique", "Модификатор + клик", "Modificador + clic" },
+            ["Skip melee on scroll"] = new[] { "Ignorer mêlée au défilement", "Nahkampf beim Scrollen skippen", "滚轮跳过近战", "滾輪跳過近戰", "スクロールで近接スキップ", "스크롤 시 근접 건너뜀", "Pular melee no scroll", "Пропуск ближнего боя", "Saltar melee al girar" },
             ["Close on movement"] = new[] { "Fermer au mouvement", "Bei Bewegung schließen", "移动时关闭", "移動時關閉", "移動で閉じる", "이동 시 닫기", "Fechar ao mover", "Закрыть при движении", "Cerrar al moverse" },
             ["Close on Shift"] = new[] { "Fermer avec Shift", "Mit Shift schließen", "按Shift时关闭", "按Shift時關閉", "Shiftで閉じる", "Shift로 닫기", "Fechar com Shift", "Закрыть при Shift", "Cerrar con Shift" },
             ["Close on Space"] = new[] { "Fermer avec Espace", "Mit Leertaste schließen", "按空格时关闭", "按空格時關閉", "スペースで閉じる", "스페이스로 닫기", "Fechar com Espaço", "Закрыть при Пробеле", "Cerrar con Espacio" },
             ["Close on damage"] = new[] { "Fermer en cas de dégâts", "Bei Schaden schließen", "受伤时关闭", "受傷時關閉", "ダメージで閉じる", "피격 시 닫기", "Fechar ao tomar dano", "Закрыть при уроне", "Cerrar al recibir daño" },
-            ["Skip melee on scroll"] = new[] { "Ignorer mêlée au défilement", "Nahkampf beim Scrollen skippen", "滚轮跳过近战", "滾輪跳過近戰", "スクロールで近接スキップ", "스크롤 시 근접 건너뜀", "Pular melee no scroll", "Пропуск ближнего боя", "Saltar melee al girar" },
-            ["Highlight loot containers"] = new[] { "Surligner les conteneurs", "Loot-Container hervorheben", "高亮战利品容器", "高亮戰利品容器", "ルートコンテナを強調", "루트 컨테이너 강조", "Destacar contêineres", "Подсветка контейнеров", "Resaltar contenedores" },
-            ["Only unsearched"] = new[] { "Seulement non fouillés", "Nur Ungesucht", "仅未搜寻", "僅未搜尋", "未探索のみ", "미수색만", "Apenas não vasculhados", "Только необысканные", "Solo sin registrar" },
-            ["Quest favorites (N key)"] = new[] { "Favoris (touche N)", "Favoriten (Taste N)", "收藏任务 (N键)", "收藏任務 (N鍵)", "お気に入り (Nキー)", "즐겨찾기 (N키)", "Favoritos (tecla N)", "Избранные (клавиша N)", "Favoritos (tecla N)" },
-            ["Show badge on recorded items"] = new[] { "Badge sur objets enregistrés", "Badge auf erfassten Gegenst.", "显示已记录徽章", "顯示已記錄徽章", "記録済みバッジ表示", "기록된 아이템 뱃지", "Badge em itens registrados", "Значок на записанных", "Insignia en registrados" },
-            ["Show FPS counter"] = new[] { "Afficher compteur FPS", "FPS-Anzeige einblenden", "显示帧率计数器", "顯示幀率計數器", "FPSカウンターを表示", "FPS 카운터 표시", "Mostrar contador FPS", "Показывать счётчик FPS", "Mostrar contador FPS" },
-            ["Hide controls hint"] = new[] { "Masquer l'aide de contrôle", "Steuerungshinweis ausblenden", "隐藏操作提示", "隱藏操作提示", "操作ヒントを非表示", "조작 힌트 숨기기", "Ocultar dica de controles", "Скрыть подсказку управления", "Ocultar ayuda de controles" },
-            ["Remember camera view"] = new[] { "Mémoriser la vue caméra", "Kameraansicht merken", "记住相机视角", "記住相機視角", "カメラビューを記憶", "카메라 뷰 기억", "Lembrar visão de câmera", "Запомнить вид камеры", "Recordar vista de cámara" },
-            ["Hide HUD on ADS"] = new[] { "Masquer HUD en visée", "HUD beim Zielen ausblenden", "瞄准时隐藏HUD", "瞄準時隱藏HUD", "ADS中HUDを非表示", "ADS 시 HUD 숨기기", "Ocultar HUD ao mirar", "Скрывать HUD при прицеливании", "Ocultar HUD al apuntar" },
-            ["Hides the entire HUD while holding right-click (OFF by default)"] = new[] { "Cache tout le HUD lors du clic droit", "Blendet HUD bei Rechtsklick aus", "右键时隐藏全部HUD", "右鍵時隱藏全部HUD", "右クリック中HUD全体を非表示", "우클릭 중 전체 HUD 숨김", "Oculta HUD ao segurar clique direito", "Скрывает весь HUD при ПКМ", "Oculta HUD al mantener clic derecho" },
-            ["Hide ammo on ADS"] = new[] { "Masquer munitions en visée", "Munition beim Zielen ausblenden", "瞄准时隐藏弹药", "瞄準時隱藏彈藥", "ADS中弾薬を非表示", "ADS 시 탄약 숨기기", "Ocultar munição ao mirar", "Скрывать боеприпасы при прицеливании", "Ocultar munición al apuntar" },
-            ["Also hides bullet type and ammo count during ADS"] = new[] { "Cache aussi le type et la quantité de munitions", "Versteckt auch Munitionstyp und -anzahl beim Zielen", "同时隐藏弹药类型和数量", "同時隱藏彈藥類型和數量", "弾薬の種類と数もADS中に非表示", "ADS 중 탄약 종류 및 수량도 숨김", "Também oculta tipo e quantidade de munição", "Также скрывает тип и количество боеприпасов", "También oculta tipo y cantidad de munición" },
-            ["Wake-up preset buttons"] = new[] { "Boutons de réveil", "Aufwach-Schnelltasten", "醒来预设按钮", "醒來預設按鈕", "起床プリセット", "기상 프리셋 버튼", "Botões de acordar", "Кнопки пробуждения", "Botones de despertar" },
-            // Sub-labels
-            ["Display mode"] = new[] { "Mode d'affichage", "Anzeigemodus", "显示模式", "顯示模式", "表示モード", "표시 모드", "Modo de exibição", "Режим отображения", "Modo de visualización" },
-            ["Modifier key"] = new[] { "Touche modificatrice", "Modifiziertaste", "修饰键", "修飾鍵", "修飾キー", "수정 키", "Tecla modificadora", "Клавиша-модификатор", "Tecla modificadora" },
-            // Preset labels
+            ["Wake-up presets"] = new[] { "Réveils préréglés", "Aufwach-Voreinstellungen", "起床预设", "起床預設", "起床プリセット", "기상 프리셋", "Presets de acordar", "Пресеты пробуждения", "Preajustes de despertar" },
             ["Preset 1"] = new[] { "Préréglage 1", "Voreinstellung 1", "预设 1", "預設 1", "プリセット 1", "프리셋 1", "Predefinição 1", "Пресет 1", "Preajuste 1" },
             ["Preset 2"] = new[] { "Préréglage 2", "Voreinstellung 2", "预设 2", "預設 2", "プリセット 2", "프리셋 2", "Predefinição 2", "Пресет 2", "Preajuste 2" },
             ["Preset 3"] = new[] { "Préréglage 3", "Voreinstellung 3", "预设 3", "預設 3", "プリセット 3", "프리셋 3", "Predefinição 3", "Пресет 3", "Preajuste 3" },
             ["Preset 4"] = new[] { "Préréglage 4", "Voreinstellung 4", "预设 4", "預設 4", "プリセット 4", "프리셋 4", "Predefinição 4", "Пресет 4", "Preajuste 4" },
-            // Close button
-            ["Close"] = new[] { "Fermer", "Schließen", "关闭", "關閉", "閉じる", "닫기", "Fechar", "Закрыть", "Cerrar" },
-            ["open / close"] = new[] { "ouvrir / fermer", "öffnen / schließen", "打开 / 关闭", "打開 / 關閉", "開く / 閉じる", "열기 / 닫기", "abrir / fechar", "открыть / закрыть", "abrir / cerrar" },
-            // Descriptions
-            ["Shows sell price at any time"] = new[] { "Affiche le prix de vente", "Zeigt Verkaufspreis jederzeit", "随时显示售价", "隨時顯示售價", "いつでも売値を表示", "언제든 판매가 표시", "Mostra preço de venda", "Показывает цену продажи", "Muestra precio de venta" },
-            ["Displayed above their health bar"] = new[] { "Au-dessus de la barre de vie", "Über der Lebensanzeige", "显示在血条上方", "顯示在血條上方", "ヘルスバーの上に表示", "체력바 위에 표시", "Exibido acima da barra de vida", "Отображается над полоской здоровья", "Sobre la barra de vida" },
-            ["Moves ammo to enemy stash when you kill them"] = new[] { "Munitions dans le loot ennemi", "Munition bei Tod in Loot", "击杀时弹药移至战利品", "擊殺時彈藥移至戰利品", "キル時に弾薬をスタッシュへ", "처치 시 탄약을 전리품으로", "Move munição para o loot", "Перемещает патроны в лут", "Mueve munición al botín" },
-            ["Shows kills in the top-right corner during raids"] = new[] { "Affiche les kills pendant raids", "Zeigt Kills während Raids", "突袭中显示击杀", "突襲中顯示擊殺", "レイド中にキルを表示", "레이드 중 킬 표시", "Mostra abates durante raids", "Показывает убийства в рейде", "Muestra bajas durante raids" },
-            ["Moves items between container and backpack"] = new[] { "Entre conteneur et sac à dos", "Zwischen Container und Rucksack", "物品在容器和背包间移动", "物品在容器和背包間移動", "コンテナとバッグ間でアイテム移動", "컨테이너와 백팩 간 이동", "Move itens entre contêiner e mochila", "Между контейнером и рюкзаком", "Mueve entre contenedor y mochila" },
-            ["W / A / S / D keys"] = new[] { "Touches W / A / S / D", "W / A / S / D Tasten", "W/A/S/D键", "W/A/S/D鍵", "W/A/S/Dキー", "W/A/S/D 키", "Teclas W/A/S/D", "Клавиши W/A/S/D", "Teclas W/A/S/D" },
-            ["When pressing Shift"] = new[] { "En appuyant sur Shift", "Beim Drücken von Shift", "按下Shift时", "按下Shift時", "Shiftを押したとき", "Shift 누를 때", "Ao pressionar Shift", "При нажатии Shift", "Al presionar Shift" },
-            ["When pressing Space"] = new[] { "En appuyant sur Espace", "Beim Drücken der Leertaste", "按下空格时", "按下空格時", "スペースを押したとき", "스페이스 누를 때", "Ao pressionar Espaço", "При нажатии Пробела", "Al presionar Espacio" },
-            ["When taking a hit"] = new[] { "En prenant un coup", "Beim Treffer", "受到攻击时", "受到攻擊時", "ヒットを受けたとき", "피격 시", "Ao receber dano", "При получении урона", "Al recibir un golpe" },
-            ["Scroll wheel skips the melee slot"] = new[] { "La molette ignore la mêlée", "Mausrad überspringt Nahkampf", "滚轮跳过近战槽", "滾輪跳過近戰槽", "スクロールで近接スロットスキップ", "스크롤로 근접 슬롯 건너뜀", "Roda pula o slot de melee", "Прокрутка пропускает ближний бой", "Rueda omite el cuerpo a cuerpo" },
-            ["Gold outline on loot boxes in the world"] = new[] { "Contour doré sur les caisses", "Goldener Umriss auf Loot-Kisten", "战利品箱金色边框", "戰利品箱金色邊框", "ルートボックスに金縁", "루트 박스에 금테", "Contorno dourado nas caixas", "Золотой контур на контейнерах", "Contorno dorado en cajas" },
-            ["Hides outline on already-opened containers"] = new[] { "Cache contour des déjà ouverts", "Versteckt Umriss geöffneter Behälter", "隐藏已打开容器的边框", "隱藏已打開容器的邊框", "開けたコンテナの縁を隠す", "열린 컨테이너 외곽선 숨김", "Oculta contorno de já abertos", "Скрывает контур открытых контейнеров", "Oculta contorno de abiertos" },
-            ["Press N on a selected quest to pin it to the top of the list"] = new[] { "N pour épingler la quête", "N drücken zum Anheften", "按N固定任务至顶部", "按N固定任務至頂部", "NでクエストをTOPに固定", "퀘스트 선택 후 N로 상단 고정", "Pressione N para fixar missão", "Нажмите N чтобы закрепить задание", "Presiona N para fijar misión" },
-            ["Green ✓ on blueprints and master keys"] = new[] { "✓ vert sur blueprints et clés", "Grünes ✓ auf Blueprints und Schlüsseln", "蓝图和主钥匙上绿色✓", "藍圖和主鑰匙上綠色✓", "設計図とマスターキーに緑✓", "설계도와 마스터키에 녹색✓", "✓ verde em blueprints e chaves", "Зелёный ✓ на чертежах и ключах", "✓ verde en blueprints y llaves" },
-            ["Displayed in the top-right corner"] = new[] { "Affiché en haut à droite", "Oben rechts angezeigt", "显示在右上角", "顯示在右上角", "右上に表示", "우측 상단에 표시", "Exibido no canto superior direito", "Отображается в правом верхнем углу", "Mostrado en esquina superior derecha" },
-            ["Hides the 'Controls [O]' button in the HUD"] = new[] { "Cache le bouton 'Contrôles [O]'", "Versteckt 'Steuerung [O]'-Taste", "隐藏'操作[O]'按钮", "隱藏'操作[O]'按鈕", "'操作[O]'ボタンを非表示", "'조작[O]' 버튼 숨기기", "Oculta botão 'Controles [O]'", "Скрывает кнопку 'Управление [O]'", "Oculta botón 'Controles [O]'" },
-            ["Restores top-down or default view between sessions"] = new[] { "Restaure la vue entre sessions", "Stellt Ansicht zwischen Sessions her", "会话间恢复相机视角", "會話間恢復相機視角", "セッション間でビューを復元", "세션 간 뷰 복원", "Restaura visão entre sessões", "Восстанавливает вид между сессиями", "Restaura vista entre sesiones" },
-            ["Adds preset buttons to the sleep screen"] = new[] { "Ajoute des boutons de réveil", "Fügt Schlaf-Schnelltasten hinzu", "在睡眠界面添加预设按钮", "在睡眠介面添加預設按鈕", "睡眠画面にプリセットボタン追加", "수면 화면에 프리셋 버튼 추가", "Adiciona botões na tela de dormir", "Добавляет кнопки на экран сна", "Añade botones en pantalla de sueño" },
-            // ModConfig labels (re-registered on language change)
-            ["Sleep preset buttons"] = new[] { "Boutons de préréglage sommeil", "Schlaf-Voreinstellungs-Tasten", "睡眠预设按钮", "睡眠預設按鈕", "睡眠プリセットボタン", "수면 프리셋 버튼", "Botões de preset de sono", "Кнопки предустановки сна", "Botones de preajuste de sueño" },
-            ["Lootbox highlight"] = new[] { "Surbrillance des caisses", "Container-Hervorhebung", "战利品箱高亮", "戰利品箱高亮", "ルートボックス強調", "루트박스 강조", "Destaque de caixas", "Подсветка контейнеров", "Resaltar cajas de botín" },
-            ["Lootbox highlight: only unsearched"] = new[] { "Surbrillance: non fouillés seul.", "Hervorhebung: nur Ungesucht", "高亮：仅未搜寻", "高亮：僅未搜尋", "強調：未探索のみ", "강조: 미수색만", "Destaque: apenas não vasc.", "Подсветка: только необысканные", "Resaltar: solo sin registrar" },
             ["FPS counter"] = new[] { "Compteur FPS", "FPS-Anzeige", "帧率计数器", "幀率計數器", "FPSカウンター", "FPS 카운터", "Contador FPS", "Счётчик FPS", "Contador FPS" },
-            ["Recorded items badge"] = new[] { "Badge objets enregistrés", "Badge erfasste Gegenstände", "已记录物品徽章", "已記錄物品徽章", "記録済みバッジ", "기록된 아이템 뱃지", "Badge de itens registrados", "Значок записанных предметов", "Insignia de objetos registrados" },
-            ["Auto-close on movement (WASD)"] = new[] { "Fermeture auto au mouvement", "Auto-Schließen bei Bewegung", "移动时自动关闭 (WASD)", "移動時自動關閉 (WASD)", "移動で自動閉鎖 (WASD)", "이동 시 자동 닫기 (WASD)", "Fechar auto ao mover (WASD)", "Авто-закрытие при движении (WASD)", "Cerrar auto al mover (WASD)" },
-            ["Auto-close on Shift"] = new[] { "Fermeture auto sur Shift", "Auto-Schließen bei Shift", "按Shift时自动关闭", "按Shift時自動關閉", "Shiftで自動閉鎖", "Shift로 자동 닫기", "Fechar auto com Shift", "Авто-закрытие при Shift", "Cerrar auto con Shift" },
-            ["Auto-close on Space"] = new[] { "Fermeture auto sur Espace", "Auto-Schließen bei Leertaste", "按空格时自动关闭", "按空格時自動關閉", "スペースで自動閉鎖", "스페이스로 자동 닫기", "Fechar auto com Espaço", "Авто-закрытие при Пробеле", "Cerrar auto con Espacio" },
-            ["Auto-close on damage"] = new[] { "Fermeture auto aux dégâts", "Auto-Schließen bei Schaden", "受伤时自动关闭", "受傷時自動關閉", "ダメージで自動閉鎖", "피격 시 자동 닫기", "Fechar auto ao tomar dano", "Авто-закрытие при уроне", "Cerrar auto al recibir daño" },
-            ["Sell value display mode"] = new[] { "Mode d'affichage de la valeur", "Anzeigemodus für Verkaufswert", "售价显示模式", "售價顯示模式", "売値表示モード", "판매가 표시 모드", "Modo de exibição de valor", "Режим отображения цены", "Modo de visualización de valor" },
-            ["Sell value on hover"] = new[] { "Valeur de vente au survol", "Verkaufswert beim Hover", "悬停售价", "懸停售價", "ホバー時の売値", "호버 시 판매가", "Valor de venda ao passar", "Цена продажи при наведении", "Valor de venta al pasar" },
-            ["Combined"] = new[] { "Combiné", "Kombiniert", "组合", "組合", "複合", "복합", "Combinado", "Комбинированный", "Combinado" },
-            ["Single only"] = new[] { "Unité seulement", "Nur einzeln", "仅单个", "僅單個", "単体のみ", "단일만", "Somente unitário", "Только единица", "Solo unitario" },
-            ["Stack only"] = new[] { "Pile seulement", "Nur Stapel", "仅堆叠", "僅堆疊", "スタックのみ", "스택만", "Somente pilha", "Только стопка", "Solo pila" },
-            ["Item transfer"] = new[] { "Transfert d'objets", "Gegenstandstransfer", "物品转移", "物品轉移", "アイテム移動", "아이템 이동", "Transferência de item", "Перенос предметов", "Transferencia de objetos" },
-            ["Disabled"] = new[] { "Désactivé", "Deaktiviert", "禁用", "禁用", "無効", "비활성화", "Desativado", "Отключено", "Desactivado" },
-            ["Enabled"] = new[] { "Activé", "Aktiviert", "启用", "啟用", "有効", "활성화", "Ativado", "Включено", "Activado" },
-            ["Shift + Left Click"] = new[] { "Shift+Clic gauche", "Shift+Linksklick", "Shift+左键单击", "Shift+左鍵單擊", "Shift+左クリック", "Shift+좌클릭", "Shift+Clique esquerdo", "Shift+Левый клик", "Shift+Clic izquierdo" },
-            ["Alt + Left Click"] = new[] { "Alt+Clic gauche", "Alt+Linksklick", "Alt+左键单击", "Alt+左鍵單擊", "Alt+左クリック", "Alt+좌클릭", "Alt+Clique esquerdo", "Alt+Левый клик", "Alt+Clic izquierdo" },
-            ["Preset 1 - hour"] = new[] { "Prérégl. 1 - heure", "Voreinst. 1 - Stunde", "预设 1 - 小时", "預設 1 - 小時", "プリセット 1 - 時間", "프리셋 1 - 시간", "Predefinição 1 - hora", "Пресет 1 - час", "Preajuste 1 - hora" },
-            ["Preset 1 - min"] = new[] { "Prérégl. 1 - min", "Voreinst. 1 - Min.", "预设 1 - 分钟", "預設 1 - 分鐘", "プリセット 1 - 分", "프리셋 1 - 분", "Predefinição 1 - min", "Пресет 1 - мин", "Preajuste 1 - min" },
-            ["Preset 2 - hour"] = new[] { "Prérégl. 2 - heure", "Voreinst. 2 - Stunde", "预设 2 - 小时", "預設 2 - 小時", "プリセット 2 - 時間", "프리셋 2 - 시간", "Predefinição 2 - hora", "Пресет 2 - час", "Preajuste 2 - hora" },
-            ["Preset 2 - min"] = new[] { "Prérégl. 2 - min", "Voreinst. 2 - Min.", "预设 2 - 分钟", "預設 2 - 分鐘", "プリセット 2 - 分", "프리셋 2 - 분", "Predefinição 2 - min", "Пресет 2 - мин", "Preajuste 2 - min" },
-            ["Preset 3 - hour"] = new[] { "Prérégl. 3 - heure", "Voreinst. 3 - Stunde", "预设 3 - 小时", "預設 3 - 小時", "プリセット 3 - 時間", "프리셋 3 - 시간", "Predefinição 3 - hora", "Пресет 3 - час", "Preajuste 3 - hora" },
-            ["Preset 3 - min"] = new[] { "Prérégl. 3 - min", "Voreinst. 3 - Min.", "预设 3 - 分钟", "預設 3 - 分鐘", "プリセット 3 - 分", "프리셋 3 - 분", "Predefinição 3 - min", "Пресет 3 - мин", "Preajuste 3 - min" },
-            ["Preset 4 - hour"] = new[] { "Prérégl. 4 - heure", "Voreinst. 4 - Stunde", "预设 4 - 小时", "預設 4 - 小時", "プリセット 4 - 時間", "프리셋 4 - 시간", "Predefinição 4 - hora", "Пресет 4 - час", "Preajuste 4 - hora" },
-            ["Preset 4 - min"] = new[] { "Prérégl. 4 - min", "Voreinst. 4 - Min.", "预设 4 - 分钟", "預設 4 - 分鐘", "プリセット 4 - 分", "프리셋 4 - 분", "Predefinição 4 - min", "Пресет 4 - мин", "Preajuste 4 - min" },
+            ["Hide controls hint"] = new[] { "Masquer l'aide de contrôle", "Steuerungshinweis ausblenden", "隐藏操作提示", "隱藏操作提示", "操作ヒントを非表示", "조작 힌트 숨기기", "Ocultar dica de controles", "Скрыть подсказку управления", "Ocultar ayuda de controles" },
+            ["Hide HUD on ADS"] = new[] { "Masquer HUD en visée", "HUD beim Zielen ausblenden", "瞄准时隐藏HUD", "瞄準時隱藏HUD", "ADS中HUDを非表示", "ADS 시 HUD 숨기기", "Ocultar HUD ao mirar", "Скрывать HUD при прицеливании", "Ocultar HUD al apuntar" },
+            ["Remember camera view"] = new[] { "Mémoriser la vue caméra", "Kameraansicht merken", "记住相机视角", "記住相機視角", "カメラビューを記憶", "카메라 뷰 기억", "Lembrar visão de câmera", "Запомнить вид камеры", "Recordar vista de cámara" },
+            ["Quest favorites (N key)"] = new[] { "Favoris (touche N)", "Favoriten (Taste N)", "任务收藏 (N键)", "任務收藏 (N鍵)", "お気に入り (Nキー)", "즐겨찾기 (N키)", "Favoritos (tecla N)", "Избранные (клавиша N)", "Favoritos (tecla N)" },
         };
 
         private static string L(string key)
@@ -1751,1260 +1614,6 @@ namespace AllInOneMod_m0n0t0ny
             if (idx >= 0 && _t.TryGetValue(key, out var arr) && idx < arr.Length)
                 return arr[idx];
             return key;
-        }
-
-        private void RebuildSettingsPanel()
-        {
-            bool wasOpen = _menuOpen;
-            if (_settingsCanvas != null) { UnityEngine.Object.Destroy(_settingsCanvas); _settingsCanvas = null; _settingsCanvasComp = null; }
-            BuildSettingsPanel();
-            if (wasOpen) SetMenuVisible(true);
-            // Re-register ModConfig labels in the new language (delegate registration is skipped via _mcDelegateRegistered)
-            if (_mcAPI != null) _mcChecked = false;
-        }
-
-        // ── Settings Panel ────────────────────────────────────────────────
-
-        private void BuildSettingsPanel()
-        {
-            _lastLang = GetGameLanguage();
-            _settingsCanvas = new GameObject("AllInOneMod_m0n0t0ny_Canvas");
-            DontDestroyOnLoad(_settingsCanvas);
-            var canvas = _settingsCanvas.AddComponent<Canvas>();
-            _settingsCanvasComp = canvas;
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 32767;
-            _settingsCanvas.AddComponent<CanvasScaler>();
-            _settingsCanvas.AddComponent<GraphicRaycaster>();
-
-            // Panel - rounded outer container, auto-sizes vertically, 800px wide, centered
-            var panel = new GameObject("Panel");
-            panel.transform.SetParent(_settingsCanvas.transform, false);
-            var panelRect = panel.AddComponent<RectTransform>();
-            panelRect.anchorMin = panelRect.anchorMax = panelRect.pivot = new Vector2(0.5f, 0.5f);
-            panelRect.anchoredPosition = Vector2.zero;
-            panelRect.sizeDelta = new Vector2(800f, 0f);
-            var panelImg = panel.AddComponent<Image>();
-            panelImg.sprite = GetOrCreateRoundedRectSprite();
-            panelImg.type = Image.Type.Sliced;
-            panelImg.color = new Color(0.047f, 0.047f, 0.055f, 0.98f);
-            var panelMask = panel.AddComponent<Mask>();
-            panelMask.showMaskGraphic = true;
-            var panelVLG = panel.AddComponent<VerticalLayoutGroup>();
-            panelVLG.childAlignment = TextAnchor.UpperCenter;
-            panelVLG.childForceExpandWidth = true;
-            panelVLG.childForceExpandHeight = false;
-            panelVLG.spacing = 0f;
-            panelVLG.padding = new RectOffset(0, 0, 0, 0);
-            panel.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            // ── Header ────────────────────────────────────────────────────
-            var header = LChild(panel, "Header", 54f);
-            header.GetComponent<Image>().color = new Color(0.060f, 0.060f, 0.072f, 1f);
-            var hHLG = header.AddComponent<HorizontalLayoutGroup>();
-            hHLG.padding = new RectOffset(16, 16, 0, 0);
-            hHLG.childAlignment = TextAnchor.MiddleLeft;
-            hHLG.childForceExpandHeight = true;
-            hHLG.childForceExpandWidth = false;
-            hHLG.spacing = 0f;
-            var titleGo = LText(header, "Title", "All In One - m0n0t0ny's Mod", 15f, flexW: 1f);
-            var titleTMP = titleGo.GetComponent<TextMeshProUGUI>();
-            titleTMP.color = Color.white;
-            titleTMP.fontStyle = FontStyles.Bold;
-            titleTMP.alignment = TextAlignmentOptions.Left;
-            var verGo = LText(header, "Ver", "v2.9", 10f, prefW: 44f);
-            verGo.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.75f, 0f, 1f);
-            verGo.GetComponent<TextMeshProUGUI>().alignment = TextAlignmentOptions.Right;
-
-            // Gold accent line
-            var accent = LChild(panel, "Accent", 2f);
-            accent.GetComponent<Image>().color = new Color(1f, 0.75f, 0f, 1f);
-
-            // ── Cards box - equal 16px padding on all four sides ─────────
-            var cardsBox = new GameObject("CardsBox");
-            cardsBox.transform.SetParent(panel.transform, false);
-            cardsBox.AddComponent<RectTransform>();
-            cardsBox.AddComponent<Image>().color = Color.clear;
-            var cbVLG = cardsBox.AddComponent<VerticalLayoutGroup>();
-            cbVLG.padding = new RectOffset(16, 16, 16, 16);
-            cbVLG.spacing = 0f;
-            cbVLG.childForceExpandWidth = true;
-            cbVLG.childForceExpandHeight = false;
-            cardsBox.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            // ── Three-column content area ─────────────────────────────────
-            var content = new GameObject("Content");
-            content.transform.SetParent(cardsBox.transform, false);
-            content.AddComponent<RectTransform>();
-            content.AddComponent<Image>().color = Color.clear;
-            var cHLG = content.AddComponent<HorizontalLayoutGroup>();
-            cHLG.padding = new RectOffset(0, 0, 0, 0);
-            cHLG.spacing = 12f;
-            cHLG.childAlignment = TextAnchor.UpperLeft;
-            cHLG.childForceExpandWidth = true;
-            cHLG.childForceExpandHeight = false;
-            content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            var col1 = LColumn(content, "Col1");
-            var col2 = LColumn(content, "Col2");
-            var col3 = LColumn(content, "Col3");
-
-            // ── COL 1: Item Value ─────────────────────────────────────────
-            var c1v = LCard(col1, L("Item Value"));
-
-            var (tRow, tImg, tThumb) = LToggleRow(c1v, L("Show sell value on hover"),
-                L("Shows sell price at any time"));
-            _toggleBtnImage = tImg;
-            _toggleBtnThumb = tThumb;
-            tRow.GetComponentInChildren<Button>().onClick.AddListener(OnToggleClicked);
-            RefreshToggleButton();
-
-            LSubLabel(c1v, L("Display mode"));
-
-            var modeRow = LChild(c1v, "ModeRow", 30f);
-            modeRow.GetComponent<Image>().color = Color.clear;
-            var mHLG = modeRow.AddComponent<HorizontalLayoutGroup>();
-            mHLG.spacing = 6f;
-            mHLG.childForceExpandWidth = true;
-            mHLG.childForceExpandHeight = true;
-
-            var (btnS, imgS, lblS) = LModeBtn(modeRow, "Single");
-            var (btnC, imgC, lblC) = LModeBtn(modeRow, "Combined");
-            var (btnT, imgT, lblT) = LModeBtn(modeRow, "Stack");
-            _modeBtnImages = new[] { imgS, imgC, imgT };
-            _modeBtnLabels = new[] { lblS, lblC, lblT };
-            btnS.onClick.AddListener(() => SetMode(DisplayMode.SingleOnly));
-            btnC.onClick.AddListener(() => SetMode(DisplayMode.Combined));
-            btnT.onClick.AddListener(() => SetMode(DisplayMode.StackOnly));
-            RefreshModeButtons();
-
-            // ── COL 1: Enemies ────────────────────────────────────────────
-            var c1e = LCard(col1, L("Enemies"));
-
-            var (enRow, enImg, enThumb) = LToggleRow(c1e, L("Show enemy names"),
-                L("Displayed above their health bar"));
-            _enemyNamesToggleImage = enImg;
-            _enemyNamesToggleThumb = enThumb;
-            enRow.GetComponentInChildren<Button>().onClick.AddListener(OnEnemyNamesToggleClicked);
-            RefreshEnemyNamesToggle();
-
-            var (auRow, auImg, auThumb) = LToggleRow(c1e, L("Auto-unload gun on kill"),
-                L("Moves ammo to enemy stash when you kill them"));
-            _autoUnloadToggleImage = auImg;
-            _autoUnloadToggleThumb = auThumb;
-            auRow.GetComponentInChildren<Button>().onClick.AddListener(OnAutoUnloadToggleClicked);
-            RefreshAutoUnloadToggle();
-
-            var (kfRow, kfImg, kfThumb) = LToggleRow(c1e, L("Kill feed"),
-                L("Shows kills in the top-right corner during raids"));
-            _killFeedToggleImage = kfImg;
-            _killFeedToggleThumb = kfThumb;
-            kfRow.GetComponentInChildren<Button>().onClick.AddListener(OnKillFeedToggleClicked);
-            RefreshKillFeedToggle();
-
-            // ── COL 1: Item Transfer ──────────────────────────────────────
-            var c1t = LCard(col1, L("Item Transfer"));
-
-            var (trRow, trImg, trThumb) = LToggleRow(c1t, L("Modifier + click to transfer"),
-                L("Moves items between container and backpack"));
-            _transferToggleImage = trImg;
-            _transferToggleThumb = trThumb;
-            trRow.GetComponentInChildren<Button>().onClick.AddListener(OnTransferToggleClicked);
-            RefreshTransferToggle();
-
-            LSubLabel(c1t, L("Modifier key"));
-
-            var modRow = LChild(c1t, "ModRow", 30f);
-            modRow.GetComponent<Image>().color = Color.clear;
-            var modHLG = modRow.AddComponent<HorizontalLayoutGroup>();
-            modHLG.spacing = 6f;
-            modHLG.childForceExpandWidth = true;
-            modHLG.childForceExpandHeight = true;
-
-            var (btnSh, imgSh, lblSh) = LModeBtn(modRow, "Shift");
-            var (btnAl, imgAl, lblAl) = LModeBtn(modRow, "Alt");
-            _transferModBtnImages = new[] { imgSh, imgAl };
-            _transferModBtnLabels = new[] { lblSh, lblAl };
-            btnSh.onClick.AddListener(() => SetTransferModifier(TransferModifier.Shift));
-            btnAl.onClick.AddListener(() => SetTransferModifier(TransferModifier.Alt));
-            RefreshTransferModifierButtons();
-
-            var warnGo = new GameObject("ShiftConflictWarn");
-            warnGo.transform.SetParent(c1t.transform, false);
-            warnGo.AddComponent<RectTransform>();
-            var warnTMP = warnGo.AddComponent<TextMeshProUGUI>();
-            warnTMP.text = "⚠ Shift is also set to close containers.\nSwitch transfer to Alt to avoid conflicts.";
-            warnTMP.fontSize = 9.5f;
-            warnTMP.color = new Color(1f, 0.75f, 0.2f, 1f);
-            warnTMP.alignment = TextAlignmentOptions.Left;
-            warnGo.AddComponent<LayoutElement>().preferredHeight = 32f;
-            _shiftConflictWarning = warnGo;
-            RefreshShiftConflict();
-
-            // ── COL 2: Auto-Close Container ───────────────────────────────
-            var c2ac = LCard(col2, L("Auto-Close Container"));
-
-            var acLabels = new (string name, string desc)[]
-            {
-                (L("Close on movement"), L("W / A / S / D keys")),
-                (L("Close on Shift"),    L("When pressing Shift")),
-                (L("Close on Space"),    L("When pressing Space")),
-                (L("Close on damage"),   L("When taking a hit")),
-            };
-            _autoCloseBtnImages = new Image[4];
-            _autoCloseBtnThumbs = new RectTransform[4];
-            for (int i = 0; i < 4; i++)
-            {
-                var idx = i;
-                var (acRow, acImg, acThumb) = LToggleRow(c2ac, acLabels[i].name, acLabels[i].desc);
-                _autoCloseBtnImages[i] = acImg;
-                _autoCloseBtnThumbs[i] = acThumb;
-                acRow.GetComponentInChildren<Button>().onClick.AddListener(() => OnAutoCloseToggleClicked(idx));
-            }
-            RefreshAutoCloseToggles();
-
-            // ── COL 2: Weapons ────────────────────────────────────────────
-            var c2w = LCard(col2, L("Weapons"));
-
-            var (smRow, smImg, smThumb) = LToggleRow(c2w, L("Skip melee on scroll"),
-                L("Scroll wheel skips the melee slot"));
-            _skipMeleeToggleImage = smImg;
-            _skipMeleeToggleThumb = smThumb;
-            smRow.GetComponentInChildren<Button>().onClick.AddListener(OnSkipMeleeToggleClicked);
-            RefreshSkipMeleeToggle();
-
-            // ── COL 2: Lootbox Highlight ──────────────────────────────────
-            var c2lb = LCard(col2, L("Lootbox Highlight"));
-
-            var (lbRow, lbImg, lbThumb) = LToggleRow(c2lb, L("Highlight loot containers"),
-                L("Gold outline on loot boxes in the world"));
-            _lootboxHLToggleImage = lbImg;
-            _lootboxHLToggleThumb = lbThumb;
-            lbRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLToggleClicked);
-            RefreshLootboxHLToggle();
-
-            var (lbuRow, lbuImg, lbuThumb) = LToggleRow(c2lb, L("Only unsearched"),
-                L("Hides outline on already-opened containers"));
-            _lootboxHLUnsearchedToggleImage = lbuImg;
-            _lootboxHLUnsearchedToggleThumb = lbuThumb;
-            lbuRow.GetComponentInChildren<Button>().onClick.AddListener(OnLootboxHLUnsearchedToggleClicked);
-            RefreshLootboxHLUnsearchedToggle();
-
-            // ── COL 2: Quest Favorites ────────────────────────────────────
-            var c2qf = LCard(col2, L("Quests"));
-
-            var (qfRow, qfImg, qfThumb) = LToggleRow(c2qf, L("Quest favorites (N key)"),
-                L("Press N on a selected quest to pin it to the top of the list"));
-            _questFavToggleImage = qfImg;
-            _questFavToggleThumb = qfThumb;
-            qfRow.GetComponentInChildren<Button>().onClick.AddListener(OnQuestFavToggleClicked);
-            RefreshQuestFavToggle();
-
-            // ── COL 3: Recorded Items ─────────────────────────────────────
-            var c3fr = LCard(col3, L("Recorded Items"));
-
-            var (frRow, frImg, frThumb) = LToggleRow(c3fr, L("Show badge on recorded items"),
-                L("Green ✓ on blueprints and master keys"));
-            _recorderToggleImage = frImg;
-            _recorderToggleThumb = frThumb;
-            frRow.GetComponentInChildren<Button>().onClick.AddListener(OnRecorderBadgeToggleClicked);
-            RefreshRecorderBadgeToggle();
-
-            // ── COL 3: FPS Counter ────────────────────────────────────────
-            var c3fps = LCard(col3, L("FPS Counter"));
-
-            var (fpsRow, fpsImg, fpsThumb) = LToggleRow(c3fps, L("Show FPS counter"),
-                L("Displayed in the top-right corner"));
-            _fpsToggleImage = fpsImg;
-            _fpsToggleThumb = fpsThumb;
-            fpsRow.GetComponentInChildren<Button>().onClick.AddListener(OnFpsToggleClicked);
-            RefreshFpsToggle();
-
-            var (hcRow, hcImg, hcThumb) = LToggleRow(c3fps, L("Hide controls hint"),
-                L("Hides the 'Controls [O]' button in the HUD"));
-            _hideCtrlToggleImage = hcImg;
-            _hideCtrlToggleThumb = hcThumb;
-            hcRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideCtrlToggleClicked);
-            RefreshHideCtrlToggle();
-
-            var (cvRow, cvImg, cvThumb) = LToggleRow(c3fps, L("Remember camera view"),
-                L("Restores top-down or default view between sessions"));
-            _cameraViewToggleImage = cvImg;
-            _cameraViewToggleThumb = cvThumb;
-            cvRow.GetComponentInChildren<Button>().onClick.AddListener(OnCameraViewToggleClicked);
-            RefreshCameraViewToggle();
-
-            var (adsRow, adsImg, adsThumb) = LToggleRow(c3fps, L("Hide HUD on ADS"),
-                L("Hides the entire HUD while holding right-click (OFF by default)"));
-            _hideHudAdsToggleImage = adsImg;
-            _hideHudAdsToggleThumb = adsThumb;
-            adsRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideHudAdsToggleClicked);
-            RefreshHideHudAdsToggle();
-
-            var (ammoAdsRow, ammoAdsImg, ammoAdsThumb) = LToggleRow(c3fps, L("Hide ammo on ADS"),
-                L("Also hides bullet type and ammo count during ADS"));
-            _hideAmmoAdsToggleImage = ammoAdsImg;
-            _hideAmmoAdsToggleThumb = ammoAdsThumb;
-            ammoAdsRow.GetComponentInChildren<Button>().onClick.AddListener(OnHideAmmoAdsToggleClicked);
-            RefreshHideAmmoAdsToggle();
-
-            // ── COL 3: Sleep Presets ──────────────────────────────────────
-            var c3sp = LCard(col3, L("Sleep Presets"));
-
-            var (stRow, stImg, stThumb) = LToggleRow(c3sp, L("Wake-up preset buttons"),
-                L("Adds preset buttons to the sleep screen"));
-            _sleepToggleImage = stImg;
-            _sleepToggleThumb = stThumb;
-            stRow.GetComponentInChildren<Button>().onClick.AddListener(OnSleepToggleClicked);
-            RefreshSleepToggle();
-
-            LPickerRow(c3sp, L("Preset 1"),
-                () => _preset1Hour,
-                v =>
-                {
-                    _preset1Hour = v; PlayerPrefs.SetInt(PREF_PRESET1H, v); PlayerPrefs.Save();
-                    if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
-                },
-                () => _preset1Min,
-                v =>
-                {
-                    _preset1Min = v; PlayerPrefs.SetInt(PREF_PRESET1M, v); PlayerPrefs.Save();
-                    if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
-                });
-
-            LPickerRow(c3sp, L("Preset 2"),
-                () => _preset2Hour,
-                v =>
-                {
-                    _preset2Hour = v; PlayerPrefs.SetInt(PREF_PRESET2H, v); PlayerPrefs.Save();
-                    if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
-                },
-                () => _preset2Min,
-                v =>
-                {
-                    _preset2Min = v; PlayerPrefs.SetInt(PREF_PRESET2M, v); PlayerPrefs.Save();
-                    if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
-                });
-
-            LPickerRow(c3sp, L("Preset 3"),
-                () => _preset3Hour,
-                v =>
-                {
-                    _preset3Hour = v; PlayerPrefs.SetInt(PREF_PRESET3H, v); PlayerPrefs.Save();
-                    if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
-                },
-                () => _preset3Min,
-                v =>
-                {
-                    _preset3Min = v; PlayerPrefs.SetInt(PREF_PRESET3M, v); PlayerPrefs.Save();
-                    if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
-                });
-
-            LPickerRow(c3sp, L("Preset 4"),
-                () => _preset4Hour,
-                v =>
-                {
-                    _preset4Hour = v; PlayerPrefs.SetInt(PREF_PRESET4H, v); PlayerPrefs.Save();
-                    if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
-                },
-                () => _preset4Min,
-                v =>
-                {
-                    _preset4Min = v; PlayerPrefs.SetInt(PREF_PRESET4M, v); PlayerPrefs.Save();
-                    if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
-                });
-
-            // ── Bottom bar ────────────────────────────────────────────────
-            var bottom = LChild(panel, "Bottom", 52f);
-            bottom.GetComponent<Image>().color = new Color(0.040f, 0.040f, 0.050f, 1f);
-            var bHLG = bottom.AddComponent<HorizontalLayoutGroup>();
-            bHLG.padding = new RectOffset(16, 16, 10, 10);
-            bHLG.spacing = 10f;
-            bHLG.childAlignment = TextAnchor.MiddleLeft;
-            bHLG.childForceExpandHeight = false;
-            bHLG.childForceExpandWidth = false;
-
-            var closeGo = new GameObject("CloseBtn");
-            closeGo.transform.SetParent(bottom.transform, false);
-            closeGo.AddComponent<RectTransform>();
-            var closeImg = closeGo.AddComponent<Image>();
-            closeImg.sprite = GetOrCreateRoundedRectSprite();
-            closeImg.type = Image.Type.Sliced;
-            closeImg.color = new Color(0.55f, 0.10f, 0.10f, 1f);
-            var closeLe = closeGo.AddComponent<LayoutElement>();
-            closeLe.preferredWidth = 110f;
-            closeLe.preferredHeight = 32f;
-            closeGo.AddComponent<Button>().onClick.AddListener(() => SetMenuVisible(false));
-            var cTxtGo = new GameObject("T");
-            cTxtGo.transform.SetParent(closeGo.transform, false);
-            var cTMP = cTxtGo.AddComponent<TextMeshProUGUI>();
-            cTMP.text = $"{L("Close")}  [{MENU_KEY}]"; cTMP.fontSize = 12f;
-            cTMP.alignment = TextAlignmentOptions.Center; cTMP.color = Color.white;
-            var cTr = cTxtGo.GetComponent<RectTransform>();
-            cTr.anchorMin = Vector2.zero; cTr.anchorMax = Vector2.one;
-            cTr.sizeDelta = Vector2.zero; cTr.anchoredPosition = Vector2.zero;
-
-            var hintGo = LText(bottom, "Hint", $"[{MENU_KEY}]  {L("open / close")}", 9f, flexW: 1f);
-            var hintTMP = hintGo.GetComponent<TextMeshProUGUI>();
-            hintTMP.color = new Color(0.28f, 0.28f, 0.35f, 1f);
-            hintTMP.alignment = TextAlignmentOptions.Right;
-
-            _settingsCanvas.SetActive(false);
-        }
-
-        // ── Layout helpers ────────────────────────────────────────────────
-
-        // Fixed-height child with Image (clear by default)
-        private static GameObject LChild(GameObject parent, string name, float h)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<Image>().color = Color.clear;
-            go.AddComponent<LayoutElement>().preferredHeight = h;
-            return go;
-        }
-
-        // Invisible gap
-        private static void LGap(GameObject parent, float h)
-        {
-            var go = new GameObject("Gap");
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<LayoutElement>().preferredHeight = h;
-        }
-
-        // Column in the three-column content area (VLG, flex width, no ContentSizeFitter - parent HLG handles sizing)
-        private static GameObject LColumn(GameObject parent, string name)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            go.AddComponent<Image>().color = Color.clear;
-            var vlg = go.AddComponent<VerticalLayoutGroup>();
-            vlg.childAlignment = TextAnchor.UpperLeft;
-            vlg.padding = new RectOffset(0, 0, 0, 0);
-            vlg.spacing = 10f;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
-            var le = go.AddComponent<LayoutElement>();
-            le.minWidth = 0f;
-            le.preferredWidth = 0f;
-            le.flexibleWidth = 1f;
-            return go;
-        }
-
-        // Rounded card - one per category, black semi-transparent bg
-        private static GameObject LCard(GameObject parent, string categoryTitle)
-        {
-            var card = new GameObject($"Card_{categoryTitle}");
-            card.transform.SetParent(parent.transform, false);
-            card.AddComponent<RectTransform>();
-            var img = card.AddComponent<Image>();
-            img.sprite = GetOrCreateRoundedRectSprite();
-            img.type = Image.Type.Sliced;
-            img.color = new Color(0f, 0f, 0f, 0.72f);
-            var vlg = card.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(10, 10, 10, 12);
-            vlg.spacing = 6f;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
-            var csf = card.AddComponent<ContentSizeFitter>();
-            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            // Category label inside card
-            var lbl = new GameObject("CardTitle");
-            lbl.transform.SetParent(card.transform, false);
-            lbl.AddComponent<RectTransform>();
-            var tmp = lbl.AddComponent<TextMeshProUGUI>();
-            tmp.text = categoryTitle.ToUpper(); tmp.fontSize = 8f;
-            tmp.color = new Color(0.42f, 0.42f, 0.52f, 1f);
-            tmp.fontStyle = FontStyles.Bold;
-            tmp.alignment = TextAlignmentOptions.Left;
-            tmp.characterSpacing = 1.2f;
-            lbl.AddComponent<LayoutElement>().preferredHeight = 11f;
-
-            LGap(card, 2f);
-            return card;
-        }
-
-        // Small sub-label (e.g. "Display mode", "Modifier key")
-        private static void LSubLabel(GameObject parent, string text)
-        {
-            var go = new GameObject("SubLabel");
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = text; tmp.fontSize = 9.5f;
-            tmp.color = new Color(0.38f, 0.38f, 0.48f, 1f);
-            tmp.fontStyle = FontStyles.Bold;
-            tmp.alignment = TextAlignmentOptions.Left;
-            go.AddComponent<LayoutElement>().preferredHeight = 14f;
-        }
-
-        // Text GO inside a layout group (optional preferred/flexible widths)
-        private static GameObject LText(GameObject parent, string name, string text, float size,
-            float prefW = -1f, float flexW = -1f)
-        {
-            var go = new GameObject(name);
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = text; tmp.fontSize = size;
-            if (prefW >= 0 || flexW >= 0)
-            {
-                var le = go.AddComponent<LayoutElement>();
-                if (prefW >= 0) le.preferredWidth = prefW;
-                if (flexW >= 0) le.flexibleWidth = flexW;
-            }
-            return go;
-        }
-
-        // Row: [VLG: Name / Description] [iOS switch]
-        private static (GameObject row, Image trackImg, RectTransform thumbRT)
-            LToggleRow(GameObject parent, string labelText, string description = "")
-        {
-            var row = new GameObject("ToggleRow");
-            row.transform.SetParent(parent.transform, false);
-            row.AddComponent<RectTransform>();
-            row.AddComponent<Image>().color = Color.clear;
-            var hlg = row.AddComponent<HorizontalLayoutGroup>();
-            hlg.childAlignment = TextAnchor.MiddleLeft;
-            hlg.childForceExpandHeight = false;
-            hlg.childForceExpandWidth = false;
-            hlg.spacing = 12f;
-            hlg.padding = new RectOffset(0, 0, 5, 5);
-            var rowCSF = row.AddComponent<ContentSizeFitter>();
-            rowCSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            // Text group: name + optional description
-            var textGrp = new GameObject("TextGroup");
-            textGrp.transform.SetParent(row.transform, false);
-            textGrp.AddComponent<RectTransform>();
-            var tgVLG = textGrp.AddComponent<VerticalLayoutGroup>();
-            tgVLG.childAlignment = TextAnchor.UpperLeft;
-            tgVLG.childForceExpandWidth = true;
-            tgVLG.childForceExpandHeight = false;
-            tgVLG.spacing = 2f;
-            textGrp.AddComponent<LayoutElement>().flexibleWidth = 1f;
-
-            var nameGo = new GameObject("Name");
-            nameGo.transform.SetParent(textGrp.transform, false);
-            nameGo.AddComponent<RectTransform>();
-            var nameTMP = nameGo.AddComponent<TextMeshProUGUI>();
-            nameTMP.text = labelText; nameTMP.fontSize = 12f;
-            nameTMP.fontStyle = FontStyles.Bold;
-            nameTMP.color = new Color(0.90f, 0.90f, 0.95f, 1f);
-            nameTMP.alignment = TextAlignmentOptions.Left;
-            nameTMP.enableWordWrapping = true;
-            nameTMP.overflowMode = TextOverflowModes.Overflow;
-            nameGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            if (!string.IsNullOrEmpty(description))
-            {
-                var descGo = new GameObject("Desc");
-                descGo.transform.SetParent(textGrp.transform, false);
-                descGo.AddComponent<RectTransform>();
-                var descTMP = descGo.AddComponent<TextMeshProUGUI>();
-                descTMP.text = description; descTMP.fontSize = 9.5f;
-                descTMP.color = new Color(0.38f, 0.38f, 0.48f, 1f);
-                descTMP.alignment = TextAlignmentOptions.Left;
-                descTMP.enableWordWrapping = true;
-                descTMP.overflowMode = TextOverflowModes.Overflow;
-                descGo.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-            }
-
-            // iOS-style toggle track (pill)
-            var track = new GameObject("Track");
-            track.transform.SetParent(row.transform, false);
-            var trackRT = track.AddComponent<RectTransform>();
-            var trackImg = track.AddComponent<Image>();
-            trackImg.sprite = GetOrCreatePillSprite();
-            trackImg.type = Image.Type.Sliced;
-            var trackBtn = track.AddComponent<Button>();
-            trackBtn.targetGraphic = trackImg;
-            var trackLE = track.AddComponent<LayoutElement>();
-            trackLE.minWidth = 44f;
-            trackLE.preferredWidth = 44f;
-            trackLE.minHeight = 24f;
-            trackLE.preferredHeight = 24f;
-            trackLE.flexibleWidth = 0f;
-
-            // White circle thumb
-            var thumb = new GameObject("Thumb");
-            thumb.transform.SetParent(track.transform, false);
-            var thumbRT = thumb.AddComponent<RectTransform>();
-            thumbRT.anchorMin = thumbRT.anchorMax = thumbRT.pivot = new Vector2(0.5f, 0.5f);
-            thumbRT.sizeDelta = new Vector2(18f, 18f);
-            var thumbImg = thumb.AddComponent<Image>();
-            thumbImg.sprite = GetOrCreateCircleSprite();
-            thumbImg.color = Color.white;
-
-            return (row, trackImg, thumbRT);
-        }
-
-        // One of the 3 mode buttons
-        private static (Button btn, Image img, TextMeshProUGUI lbl)
-            LModeBtn(GameObject parent, string label)
-        {
-            var go = new GameObject($"Mode_{label}");
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            var img = go.AddComponent<Image>();
-            var btn = go.AddComponent<Button>();
-            btn.targetGraphic = img;
-
-            var t = new GameObject("T");
-            t.transform.SetParent(go.transform, false);
-            var tmp = t.AddComponent<TextMeshProUGUI>();
-            tmp.text = label; tmp.fontSize = 11f; tmp.alignment = TextAlignmentOptions.Center;
-            var tr = t.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-
-            return (btn, img, tmp);
-        }
-
-        // Row: [Preset N]  [−][HH][+] : [−][MM][+]
-        private static void LPickerRow(GameObject parent, string label,
-            Func<int> getH, Action<int> setH, Func<int> getM, Action<int> setM)
-        {
-            var row = new GameObject($"PickerRow_{label}");
-            row.transform.SetParent(parent.transform, false);
-            row.AddComponent<RectTransform>();
-            row.AddComponent<Image>().color = Color.clear;
-            var hlg = row.AddComponent<HorizontalLayoutGroup>();
-            hlg.childAlignment = TextAnchor.MiddleLeft;
-            hlg.childForceExpandHeight = true;
-            hlg.childForceExpandWidth = false;
-            hlg.spacing = 10f;
-            row.AddComponent<LayoutElement>().preferredHeight = 32f;
-
-            var lbl = new GameObject("Label");
-            lbl.transform.SetParent(row.transform, false);
-            lbl.AddComponent<RectTransform>();
-            var lblTMP = lbl.AddComponent<TextMeshProUGUI>();
-            lblTMP.text = label; lblTMP.fontSize = 11f;
-            lblTMP.alignment = TextAlignmentOptions.Left;
-            lblTMP.color = new Color(0.52f, 0.52f, 0.62f, 1f);
-            lbl.AddComponent<LayoutElement>().preferredWidth = 58f;
-
-            var picker = new GameObject("Picker");
-            picker.transform.SetParent(row.transform, false);
-            picker.AddComponent<RectTransform>();
-            picker.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            BuildTimePicker(picker, getH, setH, getM, setM);
-        }
-
-        // ── Settings callbacks ────────────────────────────────────────────
-
-        private void SaveSellComboPrefs()
-        {
-            int v = !_showValue ? 0 : _mode switch
-            {
-                DisplayMode.SingleOnly => 1,
-                DisplayMode.StackOnly => 2,
-                _ => 3,
-            };
-            PlayerPrefs.SetInt(PREF_SELL_COMBO, v);
-        }
-
-        private void OnToggleClicked()
-        {
-            _showValue = !_showValue;
-            PlayerPrefs.SetInt(PREF_ENABLED, _showValue ? 1 : 0);
-            SaveSellComboPrefs();
-            PlayerPrefs.Save();
-            RefreshToggleButton();
-        }
-
-        private void SetMode(DisplayMode mode)
-        {
-            _mode = mode;
-            PlayerPrefs.SetInt(PREF_MODE, (int)_mode);
-            SaveSellComboPrefs();
-            PlayerPrefs.Save();
-            RefreshModeButtons();
-        }
-
-        private void OnSleepToggleClicked()
-        {
-            _sleepPresetsEnabled = !_sleepPresetsEnabled;
-            PlayerPrefs.SetInt(PREF_SLEEP_ENABLED, _sleepPresetsEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshSleepToggle();
-        }
-
-        private static void RefreshIOSToggle(Image track, RectTransform thumb, bool on)
-        {
-            track.color = on
-                ? new Color(1f, 0.75f, 0f, 1f)
-                : new Color(0.16f, 0.16f, 0.22f, 1f);
-            thumb.anchoredPosition = new Vector2(on ? 11f : -11f, 0f);
-        }
-
-        private void RefreshToggleButton()
-        {
-            RefreshIOSToggle(_toggleBtnImage!, _toggleBtnThumb!, _showValue);
-        }
-
-        private void RefreshModeButtons()
-        {
-            var modes = new[] { DisplayMode.SingleOnly, DisplayMode.Combined, DisplayMode.StackOnly };
-            for (int i = 0; i < 3; i++)
-            {
-                bool active = modes[i] == _mode;
-                _modeBtnImages![i].color = active
-                    ? new Color(0.38f, 0.26f, 0f, 1f)
-                    : new Color(0.11f, 0.115f, 0.15f, 1f);
-                _modeBtnLabels![i].color = active
-                    ? Color.white
-                    : new Color(0.40f, 0.40f, 0.50f, 1f);
-                _modeBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
-            }
-        }
-
-        private void RefreshSleepToggle()
-        {
-            RefreshIOSToggle(_sleepToggleImage!, _sleepToggleThumb!, _sleepPresetsEnabled);
-        }
-
-        private void OnEnemyNamesToggleClicked()
-        {
-            _showEnemyNames = !_showEnemyNames;
-            PlayerPrefs.SetInt(PREF_ENEMY_NAMES, _showEnemyNames ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshEnemyNamesToggle();
-        }
-
-        private void RefreshEnemyNamesToggle()
-        {
-            RefreshIOSToggle(_enemyNamesToggleImage!, _enemyNamesToggleThumb!, _showEnemyNames);
-        }
-
-        private void OnTransferToggleClicked()
-        {
-            _transferEnabled = !_transferEnabled;
-            PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, _transferEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshTransferToggle();
-            RefreshShiftConflict();
-        }
-
-        private void RefreshTransferToggle()
-        {
-            RefreshIOSToggle(_transferToggleImage!, _transferToggleThumb!, _transferEnabled);
-        }
-
-        private void SetTransferModifier(TransferModifier mod)
-        {
-            _transferModifier = mod;
-            PlayerPrefs.SetInt(PREF_TRANSFER_MOD, (int)mod);
-            PlayerPrefs.Save();
-            RefreshTransferModifierButtons();
-        }
-
-        private void RefreshTransferModifierButtons()
-        {
-            var mods = new[] { TransferModifier.Shift, TransferModifier.Alt };
-            for (int i = 0; i < 2; i++)
-            {
-                bool active = mods[i] == _transferModifier;
-                _transferModBtnImages![i].color = active
-                    ? new Color(0.38f, 0.26f, 0f, 1f)
-                    : new Color(0.11f, 0.115f, 0.15f, 1f);
-                _transferModBtnLabels![i].color = active ? Color.white : new Color(0.40f, 0.40f, 0.50f, 1f);
-                _transferModBtnLabels![i].fontStyle = active ? FontStyles.Bold : FontStyles.Normal;
-            }
-            RefreshShiftConflict();
-        }
-
-        private void RefreshShiftConflict()
-        {
-            bool conflict = _transferEnabled
-                         && _transferModifier == TransferModifier.Shift
-                         && _autoCloseOnShift;
-            if (_shiftConflictWarning != null)
-                _shiftConflictWarning.SetActive(conflict);
-        }
-
-        private void OnAutoCloseToggleClicked(int index)
-        {
-            switch (index)
-            {
-                case 0: _autoCloseOnWASD = !_autoCloseOnWASD; PlayerPrefs.SetInt(PREF_AC_WASD, _autoCloseOnWASD ? 1 : 0); break;
-                case 1: _autoCloseOnShift = !_autoCloseOnShift; PlayerPrefs.SetInt(PREF_AC_SHIFT, _autoCloseOnShift ? 1 : 0); break;
-                case 2: _autoCloseOnSpace = !_autoCloseOnSpace; PlayerPrefs.SetInt(PREF_AC_SPACE, _autoCloseOnSpace ? 1 : 0); break;
-                case 3: _autoCloseOnDamage = !_autoCloseOnDamage; PlayerPrefs.SetInt(PREF_AC_DAMAGE, _autoCloseOnDamage ? 1 : 0); break;
-            }
-            PlayerPrefs.Save();
-            RefreshAutoCloseToggles();
-            RefreshShiftConflict();
-        }
-
-        private void RefreshAutoCloseToggles()
-        {
-            var states = new[] { _autoCloseOnWASD, _autoCloseOnShift, _autoCloseOnSpace, _autoCloseOnDamage };
-            for (int i = 0; i < 4; i++)
-                RefreshIOSToggle(_autoCloseBtnImages![i], _autoCloseBtnThumbs![i], states[i]);
-        }
-
-        private void OnRecorderBadgeToggleClicked()
-        {
-            _showRecorderBadge = !_showRecorderBadge;
-            PlayerPrefs.SetInt(PREF_RECORDER_BADGE, _showRecorderBadge ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshRecorderBadgeToggle();
-            if (!_showRecorderBadge)
-            {
-                foreach (var kvp in _slotBadges)
-                    if (kvp.Value != null) kvp.Value.SetActive(false);
-            }
-        }
-
-        private void RefreshRecorderBadgeToggle()
-        {
-            RefreshIOSToggle(_recorderToggleImage!, _recorderToggleThumb!, _showRecorderBadge);
-        }
-
-        private void OnFpsToggleClicked()
-        {
-            _showFps = !_showFps;
-            PlayerPrefs.SetInt(PREF_FPS_COUNTER, _showFps ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshFpsToggle();
-            if (!_showFps && _fpsCanvas != null)
-                _fpsCanvas.SetActive(false);
-            else if (_showFps)
-            {
-                EnsureFpsCanvas();
-                _fpsCanvas!.SetActive(true);
-            }
-        }
-
-        private void RefreshFpsToggle()
-        {
-            RefreshIOSToggle(_fpsToggleImage!, _fpsToggleThumb!, _showFps);
-        }
-
-        private void OnSkipMeleeToggleClicked()
-        {
-            _skipMeleeOnScroll = !_skipMeleeOnScroll;
-            PlayerPrefs.SetInt(PREF_SKIP_MELEE, _skipMeleeOnScroll ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshSkipMeleeToggle();
-        }
-
-        private void RefreshSkipMeleeToggle()
-        {
-            RefreshIOSToggle(_skipMeleeToggleImage!, _skipMeleeToggleThumb!, _skipMeleeOnScroll);
-        }
-
-        private void OnAutoUnloadToggleClicked()
-        {
-            _autoUnloadEnabled = !_autoUnloadEnabled;
-            PlayerPrefs.SetInt(PREF_AUTO_UNLOAD, _autoUnloadEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshAutoUnloadToggle();
-        }
-
-        private void RefreshAutoUnloadToggle()
-        {
-            RefreshIOSToggle(_autoUnloadToggleImage!, _autoUnloadToggleThumb!, _autoUnloadEnabled);
-        }
-
-        private void OnLootboxHLToggleClicked()
-        {
-            _lootboxHLEnabled = !_lootboxHLEnabled;
-            PlayerPrefs.SetInt(PREF_LOOTBOX_HL, _lootboxHLEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshLootboxHLToggle();
-            if (!_lootboxHLEnabled) ClearLootboxOutlines();
-        }
-
-        private void RefreshLootboxHLToggle()
-        {
-            RefreshIOSToggle(_lootboxHLToggleImage!, _lootboxHLToggleThumb!, _lootboxHLEnabled);
-        }
-
-        private void OnLootboxHLUnsearchedToggleClicked()
-        {
-            _lootboxHLOnlyUnsearched = !_lootboxHLOnlyUnsearched;
-            PlayerPrefs.SetInt(PREF_LOOTBOX_HL_UNSEARCHED, _lootboxHLOnlyUnsearched ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshLootboxHLUnsearchedToggle();
-        }
-
-        private void RefreshLootboxHLUnsearchedToggle()
-        {
-            RefreshIOSToggle(_lootboxHLUnsearchedToggleImage!, _lootboxHLUnsearchedToggleThumb!, _lootboxHLOnlyUnsearched);
-        }
-
-        // ── ModConfig integration ─────────────────────────────────────────
-
-        private bool _mcScanDone; // true after the one-time assembly scan
-
-        private void TryInitModConfig()
-        {
-            if (_mcChecked) return;
-
-            // Step 1: scan assemblies for ModConfigAPI - runs exactly ONCE.
-            // Previously, returning early when ModConfig was absent left _mcChecked = false,
-            // causing the expensive GetTypes() loop to run every single frame.
-            if (_mcAPI == null && !_mcScanDone)
-            {
-                _mcScanDone = true;
-                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    if (_mcAPI != null) break;
-                    Type[]? types = null;
-                    try { types = asm.GetTypes(); } catch { continue; }
-                    foreach (var t in types)
-                    {
-                        if (t?.Name == "ModConfigAPI") { _mcAPI = t; break; }
-                    }
-                }
-            }
-
-            if (_mcAPI == null) { _mcChecked = true; return; } // not installed - stop forever
-
-            // Step 2: call Initialize() - returns false if ModConfig's ModBehaviour isn't running yet.
-            // Caller retries each frame via Update() until this returns true.
-            bool ready = false;
-            try
-            {
-                var initMethod = _mcAPI.GetMethod("Initialize", BindingFlags.Public | BindingFlags.Static);
-                ready = initMethod != null && (bool)(initMethod.Invoke(null, null) ?? false);
-            }
-            catch { }
-            if (!ready) return;
-
-            // Registered in reverse display order: ModConfig shows entries bottom-up,
-            // so the last registered setting appears at the top of the list.
-
-            // Sliders (sleep presets) - displayed last, registered first
-            MCAddSlider(PREF_PRESET4M, L("Preset 4 - min"), typeof(int), _preset4Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET4H, L("Preset 4 - hour"), typeof(int), _preset4Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET3M, L("Preset 3 - min"), typeof(int), _preset3Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET3H, L("Preset 3 - hour"), typeof(int), _preset3Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET2M, L("Preset 2 - min"), typeof(int), _preset2Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET2H, L("Preset 2 - hour"), typeof(int), _preset2Hour, new Vector2(0, 23));
-            MCAddSlider(PREF_PRESET1M, L("Preset 1 - min"), typeof(int), _preset1Min, new Vector2(0, 50));
-            MCAddSlider(PREF_PRESET1H, L("Preset 1 - hour"), typeof(int), _preset1Hour, new Vector2(0, 23));
-
-            MCAddBool(PREF_SLEEP_ENABLED, L("Wake-up preset buttons"), _sleepPresetsEnabled);
-            MCAddBool(PREF_CAMERA_VIEW, L("Remember camera view"), _cameraViewPersist);
-            MCAddBool(PREF_HIDE_CTRL, L("Hide controls hint"), _hideCtrlHint);
-            MCAddBool(PREF_HIDE_HUD_ADS, L("Hide HUD on ADS"), _hideHudOnAds);
-            MCAddBool(PREF_HIDE_AMMO_ADS, L("Hide ammo on ADS"), _hideAmmoOnAds);
-            MCAddBool(PREF_QUEST_FAV, L("Quest favorites (N key)"), _questFavEnabled);
-            MCAddBool(PREF_KILL_FEED, L("Kill feed"), _killFeedEnabled);
-            MCAddBool(PREF_LOOTBOX_HL_UNSEARCHED, L("Only unsearched"), _lootboxHLOnlyUnsearched);
-            MCAddBool(PREF_LOOTBOX_HL, L("Highlight loot containers"), _lootboxHLEnabled);
-            MCAddBool(PREF_SKIP_MELEE, L("Skip melee on scroll"), _skipMeleeOnScroll);
-            MCAddBool(PREF_AUTO_UNLOAD, L("Auto-unload gun on kill"), _autoUnloadEnabled);
-            MCAddBool(PREF_FPS_COUNTER, L("Show FPS counter"), _showFps);
-            MCAddBool(PREF_RECORDER_BADGE, L("Show badge on recorded items"), _showRecorderBadge);
-            MCAddBool(PREF_AC_DAMAGE, L("Close on damage"), _autoCloseOnDamage);
-            MCAddBool(PREF_AC_SPACE, L("Close on Space"), _autoCloseOnSpace);
-            MCAddBool(PREF_AC_SHIFT, L("Close on Shift"), _autoCloseOnShift);
-            MCAddBool(PREF_AC_WASD, L("Close on movement"), _autoCloseOnWASD);
-
-            // Unified item transfer dropdown: Disabled / Shift + Left Click / Alt + Left Click
-            var transferComboOpts = new SortedDictionary<string, object>
-            {
-                { L("Disabled"),         0 },
-                { L("Shift + Left Click"), 1 },
-                { L("Alt + Left Click"),   2 },
-            };
-            int transferComboDefault = !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2);
-            MCAddDropdown(PREF_TRANSFER_COMBO, L("Modifier + click to transfer"), transferComboOpts, typeof(int), transferComboDefault);
-
-            MCAddBool(PREF_ENEMY_NAMES, L("Show enemy names"), _showEnemyNames);
-
-            // Last registered = first displayed
-            int sellComboDefault = !_showValue ? 0 : _mode switch
-            {
-                DisplayMode.SingleOnly => 1,
-                DisplayMode.StackOnly => 2,
-                _ => 3,
-            };
-            var sellComboOpts = new SortedDictionary<string, object>
-            {
-                { L("Disabled"),     0 },
-                { L("Single only"),  1 },
-                { L("Stack only"),   2 },
-                { L("Combined"),     3 },
-            };
-            MCAddDropdown(PREF_SELL_COMBO, L("Show sell value on hover"), sellComboOpts, typeof(int), sellComboDefault);
-
-            // Change delegate - register only once; on language re-registration this is skipped
-            if (!_mcDelegateRegistered)
-            {
-                try
-                {
-                    _mcDelegate = OnModConfigChanged;
-                    _mcAPI.GetMethod("SafeAddOnOptionsChangedDelegate",
-                            BindingFlags.Public | BindingFlags.Static, null,
-                            new[] { typeof(Action<string>) }, null)
-                        ?.Invoke(null, new object[] { _mcDelegate });
-                    _mcDelegateRegistered = true;
-                }
-                catch { }
-            }
-
-            // OnConfigSaved fires AFTER ES3 is written - more reliable than per-change delegate
-            if (!_mcSavedRegistered)
-            {
-                try
-                {
-                    _mcAPI.GetMethod("add_OnConfigSaved",
-                            BindingFlags.Public | BindingFlags.Static, null,
-                            new[] { typeof(Action) }, null)
-                        ?.Invoke(null, new object[] { (Action)OnModConfigSaved });
-                    _mcSavedRegistered = true;
-                }
-                catch { }
-            }
-
-            _mcChecked = true; // Registration complete - stop retrying until next language change
-        }
-
-        private void OnModConfigChanged(string key)
-        {
-            if (_mcAPI == null) return;
-            ApplyModConfigValue(key);
-        }
-
-        private void ApplyModConfigValue(string key)
-        {
-            if (_mcAPI == null) return;
-
-            if (key == PREF_SELL_COMBO)
-            {
-                int sellComboDefault = !_showValue ? 0 : _mode switch
-                {
-                    DisplayMode.SingleOnly => 1,
-                    DisplayMode.StackOnly => 2,
-                    _ => 3,
-                };
-                int v = MCLoadInt(key, sellComboDefault);
-                _showValue = v != 0;
-                if (v == 1) _mode = DisplayMode.SingleOnly;
-                else if (v == 2) _mode = DisplayMode.StackOnly;
-                else if (v == 3) _mode = DisplayMode.Combined;
-                PlayerPrefs.SetInt(PREF_ENABLED, _showValue ? 1 : 0);
-                PlayerPrefs.SetInt(PREF_MODE, (int)_mode);
-                SaveSellComboPrefs();
-                RefreshToggleButton(); RefreshModeButtons();
-            }
-            else if (key == PREF_ENEMY_NAMES)
-            { _showEnemyNames = MCLoadBool(key, _showEnemyNames); PlayerPrefs.SetInt(key, _showEnemyNames ? 1 : 0); RefreshEnemyNamesToggle(); }
-            else if (key == PREF_TRANSFER_COMBO)
-            {
-                int v = MCLoadInt(key, !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2));
-                _transferEnabled = v != 0;
-                if (v == 1) _transferModifier = TransferModifier.Shift;
-                else if (v == 2) _transferModifier = TransferModifier.Alt;
-                PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, _transferEnabled ? 1 : 0);
-                PlayerPrefs.SetInt(PREF_TRANSFER_MOD, (int)_transferModifier);
-                RefreshTransferToggle();
-                RefreshTransferModifierButtons();
-                RefreshShiftConflict();
-            }
-            else if (key == PREF_AC_WASD)
-            { _autoCloseOnWASD = MCLoadBool(key, _autoCloseOnWASD); PlayerPrefs.SetInt(key, _autoCloseOnWASD ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
-            else if (key == PREF_AC_SHIFT)
-            { _autoCloseOnShift = MCLoadBool(key, _autoCloseOnShift); PlayerPrefs.SetInt(key, _autoCloseOnShift ? 1 : 0); RefreshAutoCloseToggles(); RefreshShiftConflict(); }
-            else if (key == PREF_AC_SPACE)
-            { _autoCloseOnSpace = MCLoadBool(key, _autoCloseOnSpace); PlayerPrefs.SetInt(key, _autoCloseOnSpace ? 1 : 0); RefreshAutoCloseToggles(); }
-            else if (key == PREF_AC_DAMAGE)
-            { _autoCloseOnDamage = MCLoadBool(key, _autoCloseOnDamage); PlayerPrefs.SetInt(key, _autoCloseOnDamage ? 1 : 0); RefreshAutoCloseToggles(); }
-            else if (key == PREF_SLEEP_ENABLED)
-            { _sleepPresetsEnabled = MCLoadBool(key, _sleepPresetsEnabled); PlayerPrefs.SetInt(key, _sleepPresetsEnabled ? 1 : 0); RefreshSleepToggle(); }
-            else if (key == PREF_RECORDER_BADGE)
-            {
-                _showRecorderBadge = MCLoadBool(key, _showRecorderBadge);
-                PlayerPrefs.SetInt(key, _showRecorderBadge ? 1 : 0);
-                RefreshRecorderBadgeToggle();
-                if (!_showRecorderBadge) foreach (var kvp in _slotBadges) if (kvp.Value != null) kvp.Value.SetActive(false);
-            }
-            else if (key == PREF_FPS_COUNTER)
-            {
-                _showFps = MCLoadBool(key, _showFps);
-                PlayerPrefs.SetInt(key, _showFps ? 1 : 0);
-                RefreshFpsToggle();
-                if (!_showFps && _fpsCanvas != null) _fpsCanvas.SetActive(false);
-                else if (_showFps) { EnsureFpsCanvas(); _fpsCanvas!.SetActive(true); }
-            }
-            else if (key == PREF_SKIP_MELEE)
-            { _skipMeleeOnScroll = MCLoadBool(key, _skipMeleeOnScroll); PlayerPrefs.SetInt(key, _skipMeleeOnScroll ? 1 : 0); RefreshSkipMeleeToggle(); }
-            else if (key == PREF_AUTO_UNLOAD)
-            { _autoUnloadEnabled = MCLoadBool(key, _autoUnloadEnabled); PlayerPrefs.SetInt(key, _autoUnloadEnabled ? 1 : 0); RefreshAutoUnloadToggle(); }
-            else if (key == PREF_LOOTBOX_HL)
-            { _lootboxHLEnabled = MCLoadBool(key, _lootboxHLEnabled); PlayerPrefs.SetInt(key, _lootboxHLEnabled ? 1 : 0); RefreshLootboxHLToggle(); if (!_lootboxHLEnabled) ClearLootboxOutlines(); }
-            else if (key == PREF_LOOTBOX_HL_UNSEARCHED)
-            { _lootboxHLOnlyUnsearched = MCLoadBool(key, _lootboxHLOnlyUnsearched); PlayerPrefs.SetInt(key, _lootboxHLOnlyUnsearched ? 1 : 0); RefreshLootboxHLUnsearchedToggle(); }
-            else if (key == PREF_KILL_FEED)
-            { _killFeedEnabled = MCLoadBool(key, _killFeedEnabled); PlayerPrefs.SetInt(key, _killFeedEnabled ? 1 : 0); RefreshKillFeedToggle(); }
-            else if (key == PREF_QUEST_FAV)
-            { _questFavEnabled = MCLoadBool(key, _questFavEnabled); PlayerPrefs.SetInt(key, _questFavEnabled ? 1 : 0); RefreshQuestFavToggle(); }
-            else if (key == PREF_HIDE_CTRL)
-            { _hideCtrlHint = MCLoadBool(key, _hideCtrlHint); PlayerPrefs.SetInt(key, _hideCtrlHint ? 1 : 0); RefreshHideCtrlToggle(); ApplyCtrlHintSetting(); }
-            else if (key == PREF_CAMERA_VIEW)
-            { _cameraViewPersist = MCLoadBool(key, _cameraViewPersist); PlayerPrefs.SetInt(key, _cameraViewPersist ? 1 : 0); RefreshCameraViewToggle(); }
-            else if (key == PREF_HIDE_HUD_ADS)
-            { _hideHudOnAds = MCLoadBool(key, _hideHudOnAds); PlayerPrefs.SetInt(key, _hideHudOnAds ? 1 : 0); RefreshHideHudAdsToggle(); }
-            else if (key == PREF_HIDE_AMMO_ADS)
-            { _hideAmmoOnAds = MCLoadBool(key, _hideAmmoOnAds); PlayerPrefs.SetInt(key, _hideAmmoOnAds ? 1 : 0); RefreshHideAmmoAdsToggle(); }
-            else if (key == PREF_PRESET1H || key == PREF_PRESET1M)
-            {
-                _preset1Hour = MCLoadInt(PREF_PRESET1H, _preset1Hour); _preset1Min = MCLoadInt(PREF_PRESET1M, _preset1Min);
-                PlayerPrefs.SetInt(PREF_PRESET1H, _preset1Hour); PlayerPrefs.SetInt(PREF_PRESET1M, _preset1Min);
-                if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
-            }
-            else if (key == PREF_PRESET2H || key == PREF_PRESET2M)
-            {
-                _preset2Hour = MCLoadInt(PREF_PRESET2H, _preset2Hour); _preset2Min = MCLoadInt(PREF_PRESET2M, _preset2Min);
-                PlayerPrefs.SetInt(PREF_PRESET2H, _preset2Hour); PlayerPrefs.SetInt(PREF_PRESET2M, _preset2Min);
-                if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
-            }
-            else if (key == PREF_PRESET3H || key == PREF_PRESET3M)
-            {
-                _preset3Hour = MCLoadInt(PREF_PRESET3H, _preset3Hour); _preset3Min = MCLoadInt(PREF_PRESET3M, _preset3Min);
-                PlayerPrefs.SetInt(PREF_PRESET3H, _preset3Hour); PlayerPrefs.SetInt(PREF_PRESET3M, _preset3Min);
-                if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
-            }
-            else if (key == PREF_PRESET4H || key == PREF_PRESET4M)
-            {
-                _preset4Hour = MCLoadInt(PREF_PRESET4H, _preset4Hour); _preset4Min = MCLoadInt(PREF_PRESET4M, _preset4Min);
-                PlayerPrefs.SetInt(PREF_PRESET4H, _preset4Hour); PlayerPrefs.SetInt(PREF_PRESET4M, _preset4Min);
-                if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
-            }
-            PlayerPrefs.Save();
-        }
-
-        private void MCAddBool(string key, string desc, bool def)
-        {
-            var opts = new SortedDictionary<string, object>
-            {
-                { L("Disabled"), 0 },
-                { L("Enabled"),  1 },
-            };
-            MCAddDropdown(key, desc, opts, typeof(int), def ? 1 : 0);
-        }
-
-        private void MCAddDropdown(string key, string desc, SortedDictionary<string, object> options, Type valueType, object def)
-        {
-            try
-            {
-                _mcAPI!.GetMethod("SafeAddDropdownList", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, options, valueType, def });
-            }
-            catch { }
-        }
-
-        private void MCAddSlider(string key, string desc, Type valueType, object def, Vector2 range)
-        {
-            try
-            {
-                _mcAPI!.GetMethod("SafeAddInputWithSlider", BindingFlags.Public | BindingFlags.Static)
-                    ?.Invoke(null, new object[] { MC_MOD_NAME, key, desc, valueType, def, (Vector2?)range });
-            }
-            catch { }
-        }
-
-        private bool MCLoadBool(string key, bool def)
-        {
-            return MCLoadInt(key, def ? 1 : 0) != 0;
-        }
-
-        private int MCLoadInt(string key, int def)
-        {
-            try
-            {
-                var result = _mcAPI!.GetMethod("SafeLoad", BindingFlags.Public | BindingFlags.Static)
-                    ?.MakeGenericMethod(typeof(int))
-                    .Invoke(null, new object[] { MC_MOD_NAME, key, def });
-                return result is int i ? i : def;
-            }
-            catch { return def; }
-        }
-
-        private void MCSetInt(string key, int value)
-        {
-            if (_mcAPI == null) return;
-            try
-            {
-                _mcAPI.GetMethod("SafeSave", BindingFlags.Public | BindingFlags.Static)
-                    ?.MakeGenericMethod(typeof(int))
-                    .Invoke(null, new object[] { MC_MOD_NAME, key, value });
-            }
-            catch { }
-        }
-
-        private void SyncAllToModConfig()
-        {
-            if (_mcAPI == null) return;
-            int sellV = !_showValue ? 0 : _mode switch { DisplayMode.SingleOnly => 1, DisplayMode.StackOnly => 2, _ => 3 };
-            MCSetInt(PREF_SELL_COMBO, sellV);
-            MCSetInt(PREF_ENEMY_NAMES, _showEnemyNames ? 1 : 0);
-            int transferV = !_transferEnabled ? 0 : (_transferModifier == TransferModifier.Shift ? 1 : 2);
-            MCSetInt(PREF_TRANSFER_COMBO, transferV);
-            MCSetInt(PREF_AC_WASD, _autoCloseOnWASD ? 1 : 0);
-            MCSetInt(PREF_AC_SHIFT, _autoCloseOnShift ? 1 : 0);
-            MCSetInt(PREF_AC_SPACE, _autoCloseOnSpace ? 1 : 0);
-            MCSetInt(PREF_AC_DAMAGE, _autoCloseOnDamage ? 1 : 0);
-            MCSetInt(PREF_SKIP_MELEE, _skipMeleeOnScroll ? 1 : 0);
-            MCSetInt(PREF_AUTO_UNLOAD, _autoUnloadEnabled ? 1 : 0);
-            MCSetInt(PREF_LOOTBOX_HL, _lootboxHLEnabled ? 1 : 0);
-            MCSetInt(PREF_LOOTBOX_HL_UNSEARCHED, _lootboxHLOnlyUnsearched ? 1 : 0);
-            MCSetInt(PREF_KILL_FEED, _killFeedEnabled ? 1 : 0);
-            MCSetInt(PREF_QUEST_FAV, _questFavEnabled ? 1 : 0);
-            MCSetInt(PREF_HIDE_CTRL, _hideCtrlHint ? 1 : 0);
-            MCSetInt(PREF_CAMERA_VIEW, _cameraViewPersist ? 1 : 0);
-            MCSetInt(PREF_HIDE_HUD_ADS, _hideHudOnAds ? 1 : 0);
-            MCSetInt(PREF_HIDE_AMMO_ADS, _hideAmmoOnAds ? 1 : 0);
-            MCSetInt(PREF_SLEEP_ENABLED, _sleepPresetsEnabled ? 1 : 0);
-            MCSetInt(PREF_RECORDER_BADGE, _showRecorderBadge ? 1 : 0);
-            MCSetInt(PREF_FPS_COUNTER, _showFps ? 1 : 0);
-            MCSetInt(PREF_PRESET1H, _preset1Hour); MCSetInt(PREF_PRESET1M, _preset1Min);
-            MCSetInt(PREF_PRESET2H, _preset2Hour); MCSetInt(PREF_PRESET2M, _preset2Min);
-            MCSetInt(PREF_PRESET3H, _preset3Hour); MCSetInt(PREF_PRESET3M, _preset3Min);
-            MCSetInt(PREF_PRESET4H, _preset4Hour); MCSetInt(PREF_PRESET4M, _preset4Min);
-        }
-
-        private void OnModConfigSaved()
-        {
-            // add_OnConfigSaved fires AFTER ES3 is written - call ApplyModConfigValue directly (no frame delay)
-            ApplyModConfigValue(PREF_SELL_COMBO);
-            ApplyModConfigValue(PREF_ENEMY_NAMES);
-            ApplyModConfigValue(PREF_TRANSFER_COMBO);
-            ApplyModConfigValue(PREF_AC_WASD);
-            ApplyModConfigValue(PREF_AC_SHIFT);
-            ApplyModConfigValue(PREF_AC_SPACE);
-            ApplyModConfigValue(PREF_AC_DAMAGE);
-            ApplyModConfigValue(PREF_SKIP_MELEE);
-            ApplyModConfigValue(PREF_AUTO_UNLOAD);
-            ApplyModConfigValue(PREF_LOOTBOX_HL);
-            ApplyModConfigValue(PREF_LOOTBOX_HL_UNSEARCHED);
-            ApplyModConfigValue(PREF_KILL_FEED);
-            ApplyModConfigValue(PREF_QUEST_FAV);
-            ApplyModConfigValue(PREF_HIDE_CTRL);
-            ApplyModConfigValue(PREF_CAMERA_VIEW);
-            ApplyModConfigValue(PREF_HIDE_HUD_ADS);
-            ApplyModConfigValue(PREF_HIDE_AMMO_ADS);
-            ApplyModConfigValue(PREF_SLEEP_ENABLED);
-            ApplyModConfigValue(PREF_RECORDER_BADGE);
-            ApplyModConfigValue(PREF_FPS_COUNTER);
-            ApplyModConfigValue(PREF_PRESET1H);
-            ApplyModConfigValue(PREF_PRESET1M);
-            ApplyModConfigValue(PREF_PRESET2H);
-            ApplyModConfigValue(PREF_PRESET2M);
-            ApplyModConfigValue(PREF_PRESET3H);
-            ApplyModConfigValue(PREF_PRESET3M);
-            ApplyModConfigValue(PREF_PRESET4H);
-            ApplyModConfigValue(PREF_PRESET4M);
         }
 
         // ── Item Hover UI ─────────────────────────────────────────────────
@@ -3043,90 +1652,6 @@ namespace AllInOneMod_m0n0t0ny
                 _ => isStack ? $"${singleValue} / ${stackValue}" : $"${singleValue}",
             };
             ValueText.fontSize = 20f;
-        }
-
-        // ── Time Picker ───────────────────────────────────────────────────
-
-        private static void BuildTimePicker(
-            GameObject parent,
-            Func<int> getH, Action<int> setH,
-            Func<int> getM, Action<int> setM)
-        {
-            var layout = parent.AddComponent<HorizontalLayoutGroup>();
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
-            layout.spacing = 3;
-
-            var hMinus = MakePickerBtn(parent, "−");
-            var hDisplay = MakePickerDisplay(parent, $"{getH():D2}");
-            var hPlus = MakePickerBtn(parent, "+");
-            var colon = MakePickerColon(parent);
-            var mMinus = MakePickerBtn(parent, "−");
-            var mDisplay = MakePickerDisplay(parent, $"{getM():D2}");
-            var mPlus = MakePickerBtn(parent, "+");
-
-            var hTxt = hDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
-            var mTxt = mDisplay.GetComponentInChildren<TextMeshProUGUI>()!;
-
-            hMinus.GetComponent<Button>().onClick.AddListener(() => { setH(((getH() - 1) + 24) % 24); hTxt.text = $"{getH():D2}"; });
-            hPlus.GetComponent<Button>().onClick.AddListener(() => { setH((getH() + 1) % 24); hTxt.text = $"{getH():D2}"; });
-            mMinus.GetComponent<Button>().onClick.AddListener(() => { setM(((getM() - 10) + 60) % 60); mTxt.text = $"{getM():D2}"; });
-            mPlus.GetComponent<Button>().onClick.AddListener(() => { setM((getM() + 10) % 60); mTxt.text = $"{getM():D2}"; });
-        }
-
-        private static GameObject MakePickerBtn(GameObject parent, string label)
-        {
-            var go = new GameObject($"Btn{label}");
-            go.transform.SetParent(parent.transform, false);
-            var r = go.AddComponent<RectTransform>();
-            r.sizeDelta = new Vector2(24, 28);
-            var img = go.AddComponent<Image>();
-            img.color = new Color(0.38f, 0.26f, 0f, 1f);
-            var btn = go.AddComponent<Button>();
-            var c = btn.colors;
-            c.highlightedColor = new Color(0.55f, 0.38f, 0f, 1f);
-            c.pressedColor = new Color(0.22f, 0.15f, 0f, 1f);
-            btn.colors = c;
-            var t = new GameObject("T");
-            t.transform.SetParent(go.transform, false);
-            var tmp = t.AddComponent<TextMeshProUGUI>();
-            tmp.text = label; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            var tr = t.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-            go.AddComponent<LayoutElement>().preferredWidth = 24;
-            return go;
-        }
-
-        private static GameObject MakePickerDisplay(GameObject parent, string text)
-        {
-            var go = new GameObject("Disp");
-            go.transform.SetParent(parent.transform, false);
-            var r = go.AddComponent<RectTransform>();
-            r.sizeDelta = new Vector2(36, 28);
-            go.AddComponent<Image>().color = new Color(0.06f, 0.065f, 0.085f, 1f);
-            var t = new GameObject("T");
-            t.transform.SetParent(go.transform, false);
-            var tmp = t.AddComponent<TextMeshProUGUI>();
-            tmp.text = text; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            var tr = t.GetComponent<RectTransform>();
-            tr.anchorMin = Vector2.zero; tr.anchorMax = Vector2.one;
-            tr.sizeDelta = Vector2.zero; tr.anchoredPosition = Vector2.zero;
-            go.AddComponent<LayoutElement>().preferredWidth = 36;
-            return go;
-        }
-
-        private static GameObject MakePickerColon(GameObject parent)
-        {
-            var go = new GameObject("Colon");
-            go.transform.SetParent(parent.transform, false);
-            go.AddComponent<RectTransform>();
-            var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = ":"; tmp.fontSize = 14; tmp.alignment = TextAlignmentOptions.Center;
-            tmp.color = new Color(0.5f, 0.5f, 0.6f, 1f);
-            go.AddComponent<LayoutElement>().preferredWidth = 12;
-            return go;
         }
 
         // ── Kill Feed ─────────────────────────────────────────────────────
@@ -3275,35 +1800,7 @@ namespace AllInOneMod_m0n0t0ny
             _kfEntries.Clear();
         }
 
-        private void OnKillFeedToggleClicked()
-        {
-            _killFeedEnabled = !_killFeedEnabled;
-            PlayerPrefs.SetInt(PREF_KILL_FEED, _killFeedEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshKillFeedToggle();
-        }
-
-        private void RefreshKillFeedToggle()
-        {
-            RefreshIOSToggle(_killFeedToggleImage!, _killFeedToggleThumb!, _killFeedEnabled);
-        }
-
         // ── Hide Controls Hint ────────────────────────────────────────────
-
-        private void OnHideCtrlToggleClicked()
-        {
-            _hideCtrlHint = !_hideCtrlHint;
-            PlayerPrefs.SetInt(PREF_HIDE_CTRL, _hideCtrlHint ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshHideCtrlToggle();
-            ApplyCtrlHintSetting();
-        }
-
-        private void RefreshHideCtrlToggle()
-        {
-            if (_hideCtrlToggleImage != null)
-                RefreshIOSToggle(_hideCtrlToggleImage, _hideCtrlToggleThumb!, _hideCtrlHint);
-        }
 
         private void ApplyCtrlHintSetting()
         {
@@ -3315,52 +1812,6 @@ namespace AllInOneMod_m0n0t0ny
                 if (rt != null)
                     rt.anchoredPosition = new Vector2(-32f, _hideCtrlHint ? -76f : -152f);
             }
-        }
-
-        // ── Camera View Persistence ───────────────────────────────────────
-
-        private void OnCameraViewToggleClicked()
-        {
-            _cameraViewPersist = !_cameraViewPersist;
-            PlayerPrefs.SetInt(PREF_CAMERA_VIEW, _cameraViewPersist ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshCameraViewToggle();
-        }
-
-        private void RefreshCameraViewToggle()
-        {
-            if (_cameraViewToggleImage != null)
-                RefreshIOSToggle(_cameraViewToggleImage, _cameraViewToggleThumb!, _cameraViewPersist);
-        }
-
-        // ── Hide HUD on ADS ───────────────────────────────────────────────
-
-        private void OnHideHudAdsToggleClicked()
-        {
-            _hideHudOnAds = !_hideHudOnAds;
-            PlayerPrefs.SetInt(PREF_HIDE_HUD_ADS, _hideHudOnAds ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshHideHudAdsToggle();
-        }
-
-        private void RefreshHideHudAdsToggle()
-        {
-            if (_hideHudAdsToggleImage != null)
-                RefreshIOSToggle(_hideHudAdsToggleImage, _hideHudAdsToggleThumb!, _hideHudOnAds);
-        }
-
-        private void OnHideAmmoAdsToggleClicked()
-        {
-            _hideAmmoOnAds = !_hideAmmoOnAds;
-            PlayerPrefs.SetInt(PREF_HIDE_AMMO_ADS, _hideAmmoOnAds ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshHideAmmoAdsToggle();
-        }
-
-        private void RefreshHideAmmoAdsToggle()
-        {
-            if (_hideAmmoAdsToggleImage != null)
-                RefreshIOSToggle(_hideAmmoAdsToggleImage, _hideAmmoAdsToggleThumb!, _hideAmmoOnAds);
         }
 
         // ── Quest Favorites ───────────────────────────────────────────────
@@ -3418,32 +1869,420 @@ namespace AllInOneMod_m0n0t0ny
             }
         }
 
-        private void OnQuestFavToggleClicked()
+        // ── Native Settings Tab Injection ─────────────────────────────────
+
+        private static bool EnsureOptReflection(OptionsPanel panel)
         {
-            _questFavEnabled = !_questFavEnabled;
-            PlayerPrefs.SetInt(PREF_QUEST_FAV, _questFavEnabled ? 1 : 0);
-            PlayerPrefs.Save();
-            RefreshQuestFavToggle();
-            if (!_questFavEnabled)
+            if (_optReflectionSearched) return _optTabButtonsField != null;
+            _optReflectionSearched = true;
+            _optTabButtonsField = typeof(OptionsPanel).GetField("tabButtons",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            _optTabContentField = typeof(OptionsPanel_TabButton).GetField("tab",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            _optSetupMethod = typeof(OptionsPanel).GetMethod("Setup",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            return _optTabButtonsField != null;
+        }
+
+        private static void LogHierarchy(Transform t, int depth)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < depth; i++) sb.Append("  ");
+            sb.Append($"[{t.gameObject.name}] ");
+            foreach (var comp in t.GetComponents<Component>())
+                if (comp != null) sb.Append($"<{comp.GetType().Name}> ");
+            Debug.Log(sb.ToString());
+            for (int i = 0; i < t.childCount; i++)
+                LogHierarchy(t.GetChild(i), depth + 1);
+        }
+
+        private bool TryInjectTab(string sceneName, out GameObject? tabContent)
+        {
+            tabContent = null;
+            var panels = FindObjectsOfType<OptionsPanel>(true);
+            if (panels == null || panels.Length == 0) return false;
+
+            OptionsPanel? target = null;
+            foreach (var p in panels)
             {
-                // Remove all star overlays
-                var view = QuestView.Instance;
-                if (view != null)
+                if (p == null) continue;
+                if (p.gameObject.scene.name == sceneName) { target = p; break; }
+            }
+            if (target == null) return false;
+
+            if (!EnsureOptReflection(target)) return false;
+
+            var tabButtons = _optTabButtonsField!.GetValue(target) as System.Collections.IList;
+            if (tabButtons == null) return false;
+
+            // Check if we already injected into this panel instance
+            foreach (var tb in tabButtons)
+            {
+                var tbComp = tb as OptionsPanel_TabButton;
+                if (tbComp != null && tbComp.name == "m0n0t0nyTab") return true;
+            }
+
+            // Find a non-selected tab button to clone
+            var selection = target.GetSelection();
+            OptionsPanel_TabButton? srcBtn = null;
+            foreach (var tb in tabButtons)
+            {
+                var tbComp = tb as OptionsPanel_TabButton;
+                if (tbComp != null && tbComp != selection) { srcBtn = tbComp; break; }
+            }
+            if (srcBtn == null)
+            {
+                foreach (var tb in tabButtons)
                 {
-                    var entries = _qvActiveEntriesField?.GetValue(view) as List<QuestEntry>;
-                    if (entries != null)
-                        foreach (var entry in entries)
-                        {
-                            var starTr = entry?.transform.Find("FavStar");
-                            if (starTr != null) UnityEngine.Object.Destroy(starTr.gameObject);
-                        }
+                    var tbComp = tb as OptionsPanel_TabButton;
+                    if (tbComp != null) { srcBtn = tbComp; break; }
+                }
+            }
+            if (srcBtn == null) return false;
+
+            // Clone the tab button
+            var newBtnGo = UnityEngine.Object.Instantiate(srcBtn.gameObject, srcBtn.transform.parent);
+            var newBtn = newBtnGo.GetComponent<OptionsPanel_TabButton>();
+            if (newBtn == null) { UnityEngine.Object.Destroy(newBtnGo); return false; }
+            newBtnGo.name = "m0n0t0nyTab";
+
+            // Clone the tab content
+            var srcContent = _optTabContentField!.GetValue(srcBtn) as GameObject;
+            if (srcContent == null) { UnityEngine.Object.Destroy(newBtnGo); return false; }
+            var newContent = UnityEngine.Object.Instantiate(srcContent, srcContent.transform.parent);
+            newContent.name = "m0n0t0nyContent";
+
+            // Destroy all children immediately (Destroy is deferred and would interfere with PopulateTabContent)
+            for (int i = newContent.transform.childCount - 1; i >= 0; i--)
+                UnityEngine.Object.DestroyImmediate(newContent.transform.GetChild(i).gameObject);
+
+            // Remove any layout components inherited from the clone
+            var existingVLG = newContent.GetComponent<VerticalLayoutGroup>();
+            if (existingVLG != null) UnityEngine.Object.DestroyImmediate(existingVLG);
+            var existingHLG = newContent.GetComponent<HorizontalLayoutGroup>();
+            if (existingHLG != null) UnityEngine.Object.DestroyImmediate(existingHLG);
+            var existingCSF = newContent.GetComponent<ContentSizeFitter>();
+            if (existingCSF != null) UnityEngine.Object.DestroyImmediate(existingCSF);
+
+            // No background on the content root - sections have their own native backgrounds
+            var existingBg = newContent.GetComponent<Image>();
+            if (existingBg != null) DestroyImmediate(existingBg);
+
+            // Link new content to new button
+            _optTabContentField?.SetValue(newBtn, newContent);
+
+            // Set tab button name
+            var tabNameTmp = newBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (tabNameTmp != null)
+            {
+                var loc = newBtn.GetComponentsInChildren<MonoBehaviour>(true)
+                    .FirstOrDefault(c => c.GetType().Name == "TextLocalizor");
+                if (loc != null) UnityEngine.Object.Destroy(loc);
+                tabNameTmp.text = "ALL IN ONE";
+            }
+
+            // Add to panel's tab list
+            tabButtons!.Add(newBtn);
+
+            // Refresh panel
+            _optSetupMethod?.Invoke(target, null);
+
+            tabContent = newContent;
+            return true;
+        }
+
+        private void PopulateTabContent(GameObject content)
+        {
+            // Outer VLG: stacks sections vertically with spacing between them
+            var vlg = content.AddComponent<VerticalLayoutGroup>();
+            vlg.childAlignment = TextAnchor.UpperLeft;
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.padding = new RectOffset(8, 8, 8, 8);
+            vlg.spacing = 8f;
+            content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var area = content.transform;
+
+            // Clone dropdown template from any native panel
+            OptionsUIEntry_Dropdown? dropdownTemplate = null;
+            foreach (var panel in FindObjectsOfType<OptionsPanel>(true))
+            {
+                dropdownTemplate = panel.GetComponentInChildren<OptionsUIEntry_Dropdown>(true);
+                if (dropdownTemplate != null) break;
+            }
+
+            // Find the native category wrapper from the KeyBindings tab:
+            // UI_InputBinding > Layout > first child that has VerticalLayoutGroup (the [Move] group)
+            GameObject? wrapperTemplate = null;
+            foreach (var panel in FindObjectsOfType<OptionsPanel>(true))
+            {
+                var tabBtns = _optTabButtonsField?.GetValue(panel) as System.Collections.IList;
+                if (tabBtns == null) continue;
+                foreach (var tb in tabBtns)
+                {
+                    var tbComp = tb as OptionsPanel_TabButton;
+                    if (tbComp == null) continue;
+                    var tabGo = _optTabContentField?.GetValue(tbComp) as GameObject;
+                    if (tabGo == null || tabGo.name != "UI_InputBinding") continue;
+                    var layout = tabGo.transform.Find("Layout");
+                    if (layout == null) continue;
+                    for (int i = 0; i < layout.childCount; i++)
+                    {
+                        var child = layout.GetChild(i);
+                        if (child.GetComponent<VerticalLayoutGroup>() != null)
+                        { wrapperTemplate = child.gameObject; break; }
+                    }
+                    if (wrapperTemplate != null) break;
+                }
+                if (wrapperTemplate != null) break;
+            }
+
+            var dropdownLabelField = typeof(OptionsUIEntry_Dropdown).GetField("label", BindingFlags.NonPublic | BindingFlags.Instance);
+            var dropdownDropdownField = typeof(OptionsUIEntry_Dropdown).GetField("dropdown", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            void AddToggle(string labelText, bool value, Action<bool> onChange) =>
+                AddCycle(labelText, new[] { L("Off"), L("On") }, value ? 1 : 0, idx => onChange(idx > 0));
+
+            void AddCycle(string labelText, string[] options, int currentIdx, Action<int> onChange)
+            {
+                if (dropdownTemplate == null) return;
+                var clone = Instantiate(dropdownTemplate.gameObject, area);
+                var comp = clone.GetComponent<OptionsUIEntry_Dropdown>();
+                var lbl = dropdownLabelField?.GetValue(comp) as TextMeshProUGUI;
+                var dropdown = dropdownDropdownField?.GetValue(comp) as TMP_Dropdown;
+                if (lbl != null) lbl.text = labelText;
+                if (dropdown != null)
+                {
+                    dropdown.ClearOptions();
+                    dropdown.AddOptions(new List<string>(options));
+                    dropdown.SetValueWithoutNotify(currentIdx);
+                    dropdown.onValueChanged.RemoveAllListeners();
+                    dropdown.onValueChanged.AddListener(idx => onChange(idx));
+                }
+                if (comp != null) DestroyImmediate(comp);
+                // Remove any extra direct children (e.g. globe icon siblings)
+                for (int i = clone.transform.childCount - 1; i >= 0; i--)
+                {
+                    var child = clone.transform.GetChild(i).gameObject;
+                    if (child != lbl?.gameObject && child != dropdown?.gameObject)
+                        DestroyImmediate(child);
+                }
+                // Remove globe icon from inside the dropdown GO ([Image] child alongside [Label]/[Arrow]/[Template])
+                if (dropdown != null)
+                {
+                    for (int i = dropdown.transform.childCount - 1; i >= 0; i--)
+                    {
+                        var child = dropdown.transform.GetChild(i).gameObject;
+                        if (child.name != "Label" && child.name != "Arrow" && child.name != "Template"
+                            && child.name != "[Label]" && child.name != "[Arrow]" && child.name != "[Template]")
+                            DestroyImmediate(child);
+                    }
+                }
+            }
+
+            // Clone the native wrapper, strip children, add a label, redirect area for rows
+            void AddSection(string labelText, Action fill)
+            {
+                var savedArea = area;
+                GameObject wrapper;
+                if (wrapperTemplate != null)
+                {
+                    wrapper = Instantiate(wrapperTemplate, savedArea);
+                    wrapper.name = "Section_" + labelText;
+                    for (int i = wrapper.transform.childCount - 1; i >= 0; i--)
+                        DestroyImmediate(wrapper.transform.GetChild(i).gameObject);
+                    // Ensure rows expand to fill the wrapper width
+                    var wVlg = wrapper.GetComponent<VerticalLayoutGroup>();
+                    if (wVlg != null) wVlg.childForceExpandWidth = true;
+                }
+                else
+                {
+                    // Fallback if keybindings tab not found: plain dark container
+                    wrapper = new GameObject("Section_" + labelText);
+                    wrapper.transform.SetParent(savedArea, false);
+                    wrapper.AddComponent<LayoutElement>(); // lets outer VLG size it
+                    var wVlg = wrapper.AddComponent<VerticalLayoutGroup>();
+                    wVlg.childForceExpandWidth = true;
+                    wVlg.childForceExpandHeight = false;
+                    wrapper.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                }
+
+                // Section label (same style as native [Label_Move])
+                var labelGo = new GameObject("SectionLabel");
+                labelGo.transform.SetParent(wrapper.transform, false);
+                var le = labelGo.AddComponent<LayoutElement>();
+                le.preferredHeight = 30f;
+                var tmp = labelGo.AddComponent<TextMeshProUGUI>();
+                tmp.text = labelText.ToUpper();
+                tmp.fontSize = 12f;
+                tmp.color = Color.white;
+                tmp.fontStyle = FontStyles.Bold;
+                tmp.alignment = TextAlignmentOptions.MidlineLeft;
+                var rt = labelGo.GetComponent<RectTransform>();
+                rt.offsetMin = new Vector2(12f, 0f);
+
+                area = wrapper.transform;
+                fill();
+                area = savedArea;
+            }
+
+            // ── Looting ───────────────────────────────────────────────────────
+            AddSection(L("Looting"), () =>
+            {
+                // idx: 0=Combined, 1=Single, 2=Stack, 3=Off
+                AddCycle(L("Show item value on hover"), new[] { L("Combined"), L("Single"), L("Stack"), L("Off") },
+                    !_showValue ? 3 : (int)_mode,
+                    idx =>
+                    {
+                        if (idx == 3) { _showValue = false; PlayerPrefs.SetInt(PREF_ENABLED, 0); }
+                        else { _showValue = true; _mode = (DisplayMode)idx; PlayerPrefs.SetInt(PREF_ENABLED, 1); PlayerPrefs.SetInt(PREF_MODE, idx); }
+                        PlayerPrefs.Save();
+                    });
+                // idx: 0=Alt+Click, 1=Shift+Click, 2=Off
+                AddCycle(L("Quick item transfer"), new[] { "Alt + Click", "Shift + Click", L("Off") },
+                    !_transferEnabled ? 2 : (_transferModifier == TransferModifier.Alt ? 0 : 1),
+                    idx =>
+                    {
+                        if (idx == 2) { _transferEnabled = false; PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, 0); }
+                        else { _transferEnabled = true; _transferModifier = idx == 0 ? TransferModifier.Alt : TransferModifier.Shift; PlayerPrefs.SetInt(PREF_TRANSFER_ENABLED, 1); PlayerPrefs.SetInt(PREF_TRANSFER_MOD, (int)_transferModifier); }
+                        PlayerPrefs.Save();
+                    });
+                // idx: 0=All, 1=Only unsearched, 2=Off
+                AddCycle(L("Highlight loot container"), new[] { L("All"), L("Only unsearched"), L("Off") },
+                    !_lootboxHLEnabled ? 2 : (_lootboxHLOnlyUnsearched ? 1 : 0),
+                    idx =>
+                    {
+                        if (idx == 2) { _lootboxHLEnabled = false; PlayerPrefs.SetInt(PREF_LOOTBOX_HL, 0); }
+                        else { _lootboxHLEnabled = true; _lootboxHLOnlyUnsearched = idx == 1; PlayerPrefs.SetInt(PREF_LOOTBOX_HL, 1); PlayerPrefs.SetInt(PREF_LOOTBOX_HL_UNSEARCHED, idx == 1 ? 1 : 0); }
+                        PlayerPrefs.Save();
+                    });
+                AddToggle(L("Badge on recorded Keys and Blueprints"), _showRecorderBadge, v => { _showRecorderBadge = v; PlayerPrefs.SetInt(PREF_RECORDER_BADGE, v ? 1 : 0); PlayerPrefs.Save(); });
+            });
+
+            // ── Combat ────────────────────────────────────────────────────────
+            AddSection(L("Combat"), () =>
+            {
+                AddToggle(L("Show enemy name"), _showEnemyNames, v => { _showEnemyNames = v; PlayerPrefs.SetInt(PREF_ENEMY_NAMES, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Auto-unload enemy gun on kill"), _autoUnloadEnabled, v => { _autoUnloadEnabled = v; PlayerPrefs.SetInt(PREF_AUTO_UNLOAD, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Kill feed"), _killFeedEnabled, v => { _killFeedEnabled = v; PlayerPrefs.SetInt(PREF_KILL_FEED, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Skip melee on scroll"), _skipMeleeOnScroll, v => { _skipMeleeOnScroll = v; PlayerPrefs.SetInt(PREF_SKIP_MELEE, v ? 1 : 0); PlayerPrefs.Save(); });
+            });
+
+            // ── Survival ──────────────────────────────────────────────────────
+            AddSection(L("Survival"), () =>
+            {
+                AddToggle(L("Close on movement"), _autoCloseOnWASD, v => { _autoCloseOnWASD = v; PlayerPrefs.SetInt(PREF_AC_WASD, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Close on Shift"), _autoCloseOnShift, v => { _autoCloseOnShift = v; PlayerPrefs.SetInt(PREF_AC_SHIFT, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Close on Space"), _autoCloseOnSpace, v => { _autoCloseOnSpace = v; PlayerPrefs.SetInt(PREF_AC_SPACE, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Close on damage"), _autoCloseOnDamage, v => { _autoCloseOnDamage = v; PlayerPrefs.SetInt(PREF_AC_DAMAGE, v ? 1 : 0); PlayerPrefs.Save(); });
+                AddToggle(L("Wake-up preset buttons"), _sleepPresetsEnabled, v => { _sleepPresetsEnabled = v; PlayerPrefs.SetInt(PREF_SLEEP_ENABLED, v ? 1 : 0); PlayerPrefs.Save(); });
+                var timeSlots = Enumerable.Range(0, 96).Select(i => $"{i / 4:D2}:{(i % 4) * 15:D2}").ToArray();
+                AddCycle(L("Preset 1"), timeSlots, _preset1Hour * 4 + _preset1Min / 15, idx =>
+                {
+                    _preset1Hour = idx / 4; _preset1Min = (idx % 4) * 15;
+                    PlayerPrefs.SetInt(PREF_PRESET1H, _preset1Hour); PlayerPrefs.SetInt(PREF_PRESET1M, _preset1Min); PlayerPrefs.Save();
+                    if (_preset1BtnLabel != null) _preset1BtnLabel.text = $"{_preset1Hour:D2}:{_preset1Min:D2}";
+                });
+                AddCycle(L("Preset 2"), timeSlots, _preset2Hour * 4 + _preset2Min / 15, idx =>
+                {
+                    _preset2Hour = idx / 4; _preset2Min = (idx % 4) * 15;
+                    PlayerPrefs.SetInt(PREF_PRESET2H, _preset2Hour); PlayerPrefs.SetInt(PREF_PRESET2M, _preset2Min); PlayerPrefs.Save();
+                    if (_preset2BtnLabel != null) _preset2BtnLabel.text = $"{_preset2Hour:D2}:{_preset2Min:D2}";
+                });
+                AddCycle(L("Preset 3"), timeSlots, _preset3Hour * 4 + _preset3Min / 15, idx =>
+                {
+                    _preset3Hour = idx / 4; _preset3Min = (idx % 4) * 15;
+                    PlayerPrefs.SetInt(PREF_PRESET3H, _preset3Hour); PlayerPrefs.SetInt(PREF_PRESET3M, _preset3Min); PlayerPrefs.Save();
+                    if (_preset3BtnLabel != null) _preset3BtnLabel.text = $"{_preset3Hour:D2}:{_preset3Min:D2}";
+                });
+                AddCycle(L("Preset 4"), timeSlots, _preset4Hour * 4 + _preset4Min / 15, idx =>
+                {
+                    _preset4Hour = idx / 4; _preset4Min = (idx % 4) * 15;
+                    PlayerPrefs.SetInt(PREF_PRESET4H, _preset4Hour); PlayerPrefs.SetInt(PREF_PRESET4M, _preset4Min); PlayerPrefs.Save();
+                    if (_preset4BtnLabel != null) _preset4BtnLabel.text = $"{_preset4Hour:D2}:{_preset4Min:D2}";
+                });
+            });
+
+            // ── HUD ───────────────────────────────────────────────────────────
+            AddSection(L("HUD"), () =>
+            {
+                AddToggle(L("Show FPS counter"), _showFps, v =>
+                {
+                    _showFps = v; PlayerPrefs.SetInt(PREF_FPS_COUNTER, v ? 1 : 0); PlayerPrefs.Save();
+                    if (_fpsCanvas != null) _fpsCanvas.SetActive(v);
+                });
+                AddToggle(L("Hide controls hint"), _hideCtrlHint, v =>
+                {
+                    _hideCtrlHint = v; PlayerPrefs.SetInt(PREF_HIDE_CTRL, v ? 1 : 0); PlayerPrefs.Save();
+                    ApplyCtrlHintSetting();
+                });
+                // idx: 0=Hide all, 1=Show only ammo, 2=Off
+                AddCycle(L("Hide HUD on ADS"), new[] { L("Hide all"), L("Show Only Ammo"), L("Off") },
+                    !_hideHudOnAds ? 2 : (_hideAmmoOnAds ? 0 : 1),
+                    idx =>
+                    {
+                        if (idx == 2) { _hideHudOnAds = false; _hideAmmoOnAds = false; PlayerPrefs.SetInt(PREF_HIDE_HUD_ADS, 0); PlayerPrefs.SetInt(PREF_HIDE_AMMO_ADS, 0); }
+                        else { _hideHudOnAds = true; _hideAmmoOnAds = idx == 0; PlayerPrefs.SetInt(PREF_HIDE_HUD_ADS, 1); PlayerPrefs.SetInt(PREF_HIDE_AMMO_ADS, idx == 0 ? 1 : 0); }
+                        PlayerPrefs.Save();
+                    });
+                AddToggle(L("Remember camera view"), _cameraViewPersist, v =>
+                {
+                    _cameraViewPersist = v; PlayerPrefs.SetInt(PREF_CAMERA_VIEW, v ? 1 : 0);
+                    if (!v) PlayerPrefs.DeleteKey("CameraViewSavedTopDown");
+                    PlayerPrefs.Save();
+                });
+            });
+
+            // ── Quests ────────────────────────────────────────────────────────
+            AddSection(L("Quests"), () =>
+            {
+                AddToggle(L("Quest favorites (N key)"), _questFavEnabled, v => { _questFavEnabled = v; PlayerPrefs.SetInt(PREF_QUEST_FAV, v ? 1 : 0); PlayerPrefs.Save(); });
+            });
+        }
+
+        private void TryInjectSettingsTab()
+        {
+            if (!_ddolTabInited)
+            {
+                // TryInjectTab returns true both on fresh injection (ddolContent != null)
+                // and when the tab already exists (ddolContent == null). Either way, mark done.
+                if (TryInjectTab("DontDestroyOnLoad", out var ddolContent))
+                {
+                    if (ddolContent != null)
+                    {
+                        PopulateTabContent(ddolContent);
+                        _ddolTabContent = ddolContent;
+                        _tabBuiltLang = GetGameLanguage();
+                    }
+                    _ddolTabInited = true;
+                }
+            }
+            // MainMenu panel only exists outside raids; LevelManager is null in menu scenes.
+            if (!_mmTabInited && LevelManager.Instance == null)
+            {
+                if (TryInjectTab("MainMenu", out var mmContent))
+                {
+                    if (mmContent != null)
+                    {
+                        PopulateTabContent(mmContent);
+                        _mmTabContent = mmContent;
+                        _tabBuiltLang = GetGameLanguage();
+                    }
+                    _mmTabInited = true;
                 }
             }
         }
 
-        private void RefreshQuestFavToggle()
+        private void RefreshTabContent(GameObject content)
         {
-            RefreshIOSToggle(_questFavToggleImage!, _questFavToggleThumb!, _questFavEnabled);
+            for (int i = content.transform.childCount - 1; i >= 0; i--)
+                DestroyImmediate(content.transform.GetChild(i).gameObject);
+            var vlg = content.GetComponent<VerticalLayoutGroup>();
+            if (vlg != null) DestroyImmediate(vlg);
+            var csf = content.GetComponent<ContentSizeFitter>();
+            if (csf != null) DestroyImmediate(csf);
+            PopulateTabContent(content);
         }
     }
 }
