@@ -1,11 +1,11 @@
 # ALL IN ONE - m0n0t0ny's mod
 
-All-in-one quality of life mod for **Escape from Duckov**. 15 independent features, all configurable from the native **Settings** menu.
+All-in-one quality of life mod for **Escape from Duckov**. 20 independent features, all configurable from the native **Settings** menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
-![Preview](duckov_modding/m0n0t0nysMod/ReleaseExample/AllInOneMod_m0n0t0ny/preview.png)
+![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
 ---
 
@@ -24,6 +24,9 @@ Shows the sell price of any item at any time, not just in shops. Choose between 
 
 ![Item sell value](assets/item-sell-value.png)
 
+#### Inventory count on hover
+Shows how many of the hovered item you are carrying and how many are in your stash. Toggleable from settings (ON by default).
+
 #### Quick item transfer
 Alt+click or Shift+click to instantly move items between an open container and your backpack, and vice versa.
 
@@ -36,9 +39,17 @@ A green checkmark on keys and blueprints you have already recorded, so you know 
 ![Recorded items badge](assets/recorded-items-badge.png)
 
 #### Lootbox highlight
-Gold outline on loot containers in the world so you never miss one. Three modes: All / Only unsearched / Off.
+Colored outline on loot containers in the world so you never miss one. Three modes: All / Only unsearched / Off. Border color follows item rarity (white for empty containers).
 
 ![Lootbox highlight](assets/lootbox-highlight.png)
+
+#### Item rarity display
+Colored border on inventory slots based on item sell value. Six tiers from white (low value) to red (high value). Toggleable from settings.
+
+![Item rarity display](assets/item-rarity-display.png)
+
+#### Item name label
+Item names on inventory slots are centered and shown without background label.
 
 ---
 
@@ -51,6 +62,12 @@ Displays the enemy name above their health bar.
 
 #### Kill feed
 Shows kills in the top-right corner during raids - killer, victim, and [HS] tag on headshots.
+
+#### Boss map markers
+Real-time markers on the fullscreen map for each boss, color-coded (red=alive, grey=dead). A boss list overlay appears when the map is open. Toggleable from settings (ON by default).
+
+#### Show hidden enemy health bars
+Forces health bars visible on enemies whose bar is hidden by default (e.g. the ??? boss). Toggleable from settings (ON by default).
 
 #### Skip melee on scroll
 Scroll wheel skips the melee slot when cycling weapons. Melee can still be equipped via V.
@@ -84,8 +101,8 @@ Hides the HUD while holding right-click for a cleaner, more immersive aiming exp
 
 ![Hide HUD on ADS](assets/hide-hud-on-ads.png)
 
-#### Remember camera view
-Remembers your camera preference (top-down or default) between sessions, and restores it automatically on load.
+#### Camera view
+Three-mode setting: Off / Default / Top-down. The selected view is applied immediately and restored automatically on scene load.
 
 ---
 
@@ -121,16 +138,6 @@ The mod updates automatically whenever a new version is published.
 3. Launch the game -> **Mods** in the main menu -> enable the mod
 
 To update manually, replace the `AllInOneMod_m0n0t0ny` folder with the new version.
-
----
-
-## Building from source
-
-Requirements: .NET SDK, Escape from Duckov installed.
-
-1. Open `duckov_modding/m0n0t0nysMod.sln` in Visual Studio or Rider
-2. Set `DuckovPath` in `m0n0t0nysMod.csproj` to your game installation folder
-3. Build in Release configuration - the output DLL is in `bin/Release/netstandard2.1/`
 
 ---
 
