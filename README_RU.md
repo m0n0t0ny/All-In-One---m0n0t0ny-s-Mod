@@ -1,5 +1,7 @@
 # ALL IN ONE - m0n0t0ny's mod
 
+[English](README.md) | [Italiano](README_IT.md) | [Français](README_FR.md) | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Português](README_PT_BR.md) | Русский | [Español](README_ES.md)
+
 Универсальный мод для улучшения качества игры в **Escape from Duckov**. 20 независимых функций, все настраиваются через стандартное меню **Настройки**.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)

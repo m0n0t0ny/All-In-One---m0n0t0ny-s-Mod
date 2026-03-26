@@ -1,5 +1,7 @@
 # ALL IN ONE - m0n0t0ny's mod
 
+[English](README.md) | [Italiano](README_IT.md) | [Français](README_FR.md) | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | 한국어 | [Português](README_PT_BR.md) | [Русский](README_RU.md) | [Español](README_ES.md)
+
 **Escape from Duckov**를 위한 올인원 삶의 질 향상 모드. 20개의 독립적인 기능이 모두 기본 **설정** 메뉴에서 구성 가능합니다.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)

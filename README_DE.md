@@ -1,5 +1,7 @@
 # ALL IN ONE - m0n0t0ny's mod
 
+[English](README.md) | [Italiano](README_IT.md) | [Français](README_FR.md) | Deutsch | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Português](README_PT_BR.md) | [Русский](README_RU.md) | [Español](README_ES.md)
+
 All-in-one Lebensqualitäts-Mod für **Escape from Duckov**. 20 unabhängige Funktionen, alle über das native **Einstellungen**-Menü konfigurierbar.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
