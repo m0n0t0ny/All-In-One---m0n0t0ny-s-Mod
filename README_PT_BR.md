@@ -7,7 +7,7 @@ Mod completo de qualidade de vida para **Escape from Duckov**. 20 funcionalidade
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
-**Conteúdo:** [Funcionalidades](#funcionalidades) · [Saque](#-saque) · [Combate](#-combate) · [Sobrevivência](#-sobrevivência) · [HUD](#-hud) · [Missões](#-missões) · [Instalação](#instalação) · [Changelog](#changelog)
+**Conteúdo:** [Funcionalidades](#funcionalidades) · [Saque](#-saque) · [Combate](#-combate) · [Sobrevivência](#-sobrevivência) · [HUD](#-hud) · [Missões](#-missões) · [Desempenho](#desempenho) · [Instalação](#instalação) · [Changelog](#changelog)
 
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
@@ -120,6 +120,18 @@ Configuração de três modos: Desativado / Padrão / Visão de cima. A visão s
 Pressione N em uma missão selecionada para fixá-la no topo da lista. Missões fixadas são sempre visíveis independentemente dos filtros.
 
 ![Missões favoritas](assets/quest-favorites.png)
+
+## Desempenho
+
+A maioria dos recursos é orientada por eventos e não tem impacto mensurável no desempenho. Alguns realizam varreduras periódicas da cena que podem causar pequenas travadas em hardware menos potente. Se você experimentar quedas de framerate, tente desativar esses recursos primeiro, em ordem de impacto:
+
+| Recurso | Picos/sessão | Pico médio | Sobrecarga total | % |
+|---|---|---|---|---|
+| Mostrar barras de vida ocultas de inimigos | 32 | ~24ms | ~768ms | 34% |
+| Exibição de raridade de itens | 43 | ~13ms | ~559ms | 25% |
+| Destaque de caixas de saque | 32 | ~14ms | ~448ms | 20% |
+| Mostrar nome do inimigo | 32 | ~13ms | ~416ms | 18% |
+| Marcadores de chefes no mapa | 5 | ~15ms | ~75ms | 3% |
 
 ---
 

@@ -7,7 +7,7 @@ All-in-one quality of life mod for **Escape from Duckov**. 20 independent featur
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
-**Contents:** [Features](#features) · [Looting](#-looting) · [Combat](#-combat) · [Survival](#-survival) · [HUD](#-hud) · [Quests](#-quests) · [Installation](#installation) · [Changelog](#changelog)
+**Contents:** [Features](#features) · [Looting](#-looting) · [Combat](#-combat) · [Survival](#-survival) · [HUD](#-hud) · [Quests](#-quests) · [Performance](#performance) · [Installation](#installation) · [Changelog](#changelog)
 
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
@@ -120,6 +120,18 @@ Three-mode setting: Off / Default / Top-down. The selected view is applied immed
 Press N on a selected quest to pin it to the top of the list. Pinned quests are always visible regardless of filters.
 
 ![Quest favorites](assets/quest-favorites.png)
+
+## Performance
+
+Most features are event-driven and have no measurable frame impact. A few perform periodic scene scans that may cause brief stutters on lower-end hardware. If you experience framerate drops, try disabling these first, in order of impact:
+
+| Feature | Spikes/session | Avg spike | Total overhead | % |
+|---|---|---|---|---|
+| Show hidden enemy health bars | 32 | ~24ms | ~768ms | 34% |
+| Item rarity display | 43 | ~13ms | ~559ms | 25% |
+| Lootbox highlight | 32 | ~14ms | ~448ms | 20% |
+| Enemy names | 32 | ~13ms | ~416ms | 18% |
+| Boss map markers | 5 | ~15ms | ~75ms | 3% |
 
 ---
 

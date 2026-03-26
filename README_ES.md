@@ -7,7 +7,7 @@ Mod de calidad de vida todo en uno para **Escape from Duckov**. 20 funciones ind
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
-**Contenido:** [Funciones](#funciones) · [Saqueo](#-saqueo) · [Combate](#-combate) · [Supervivencia](#-supervivencia) · [HUD](#-hud) · [Misiones](#-misiones) · [Instalación](#instalación) · [Changelog](#changelog)
+**Contenido:** [Funciones](#funciones) · [Saqueo](#-saqueo) · [Combate](#-combate) · [Supervivencia](#-supervivencia) · [HUD](#-hud) · [Misiones](#-misiones) · [Rendimiento](#rendimiento) · [Instalación](#instalación) · [Changelog](#changelog)
 
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
@@ -120,6 +120,18 @@ Ajuste de tres modos: Desactivado / Predeterminado / Vista cenital. La vista sel
 Pulsa N en una misión seleccionada para fijarla en la parte superior de la lista. Las misiones fijadas siempre son visibles independientemente de los filtros.
 
 ![Misiones favoritas](assets/quest-favorites.png)
+
+## Rendimiento
+
+La mayoría de las funciones están basadas en eventos y no tienen un impacto medible en el rendimiento. Algunas realizan análisis periódicos de la escena que pueden causar breves stutters en hardware menos potente. Si experimentas caídas de framerate, intenta desactivar estas funciones primero, en orden de impacto:
+
+| Función | Picos/sesión | Pico promedio | Sobrecarga total | % |
+|---|---|---|---|---|
+| Mostrar barras de vida ocultas de enemigos | 32 | ~24ms | ~768ms | 34% |
+| Visualización de rareza de objetos | 43 | ~13ms | ~559ms | 25% |
+| Resaltado de cajas de botín | 32 | ~14ms | ~448ms | 20% |
+| Mostrar el nombre del enemigo | 32 | ~13ms | ~416ms | 18% |
+| Marcadores de jefes en el mapa | 5 | ~15ms | ~75ms | 3% |
 
 ---
 

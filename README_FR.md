@@ -7,7 +7,7 @@ Mod de qualité de vie tout-en-un pour **Escape from Duckov**. 20 fonctionnalit�
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
-**Sommaire:** [Fonctionnalités](#fonctionnalités) · [Pillage](#-pillage) · [Combat](#-combat) · [Survie](#-survie) · [HUD](#-hud) · [Quêtes](#-quêtes) · [Installation](#installation) · [Changelog](#changelog)
+**Sommaire:** [Fonctionnalités](#fonctionnalités) · [Pillage](#-pillage) · [Combat](#-combat) · [Survie](#-survie) · [HUD](#-hud) · [Quêtes](#-quêtes) · [Performances](#performances) · [Installation](#installation) · [Changelog](#changelog)
 
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
@@ -120,6 +120,18 @@ Paramètre à trois modes : Désactivé / Par défaut / Vue du dessus. La vue s�
 Appuyez sur N sur une quête sélectionnée pour l'épingler en haut de la liste. Les quêtes épinglées sont toujours visibles quels que soient les filtres.
 
 ![Quêtes favorites](assets/quest-favorites.png)
+
+## Performances
+
+La plupart des fonctionnalités sont pilotées par événements et n'ont aucun impact mesurable sur les performances. Quelques-unes effectuent des analyses périodiques de la scène pouvant provoquer de brefs stutters sur du matériel moins puissant. En cas de baisses de framerate, essayez de désactiver ces fonctionnalités en premier, dans l'ordre d'impact :
+
+| Fonctionnalité | Pics/session | Pic moyen | Surcharge totale | % |
+|---|---|---|---|---|
+| Afficher les barres de vie cachées des ennemis | 32 | ~24ms | ~768ms | 34% |
+| Affichage de la rareté des objets | 43 | ~13ms | ~559ms | 25% |
+| Mise en évidence des conteneurs de butin | 32 | ~14ms | ~448ms | 20% |
+| Afficher le nom de l'ennemi | 32 | ~13ms | ~416ms | 18% |
+| Marqueurs de carte des boss | 5 | ~15ms | ~75ms | 3% |
 
 ---
 
