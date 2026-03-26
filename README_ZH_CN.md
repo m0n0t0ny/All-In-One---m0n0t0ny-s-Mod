@@ -7,6 +7,8 @@
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
+**目录:** [功能](#功能) · [拾取](#-拾取) · [战斗](#-战斗) · [生存](#-生存) · [HUD](#-hud) · [任务](#-任务) · [安装](#安装) · [更新日志](#更新日志)
+
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
 ---

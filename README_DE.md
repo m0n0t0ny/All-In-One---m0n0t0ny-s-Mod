@@ -7,6 +7,8 @@ All-in-one Lebensqualitäts-Mod für **Escape from Duckov**. 20 unabhängige Fun
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
 
+**Inhalt:** [Funktionen](#funktionen) · [Plündern](#-plündern) · [Kampf](#-kampf) · [Überleben](#-überleben) · [HUD](#-hud) · [Aufgaben](#-aufgaben) · [Installation](#installation) · [Changelog](#changelog)
+
 ![Preview](AllInOneMod_m0n0t0ny/preview.png)
 
 ---
