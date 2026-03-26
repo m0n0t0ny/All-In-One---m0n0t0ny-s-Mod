@@ -29,6 +29,8 @@ Shows the sell price of any item at any time, not just in shops. Choose between 
 #### Inventory count on hover
 Shows how many of the hovered item you are carrying and how many are in your stash. Toggleable from settings (ON by default).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Quick item transfer
 Alt+click or Shift+click to instantly move items between an open container and your backpack, and vice versa.
 
@@ -43,7 +45,7 @@ A green checkmark on keys and blueprints you have already recorded, so you know 
 #### Lootbox highlight
 Colored outline on loot containers in the world so you never miss one. Three modes: All / Only unsearched / Off. Border color follows item rarity (white for empty containers).
 
-![Lootbox highlight](assets/lootbox-highlight.png)
+![Lootbox highlight](assets/lootbox-highlight-coloured.png)
 
 #### Item rarity display
 Colored border on inventory slots based on item sell value. Six tiers from white (low value) to red (high value). Toggleable from settings.
@@ -67,6 +69,8 @@ Shows kills in the top-right corner during raids - killer, victim, and [HS] tag 
 
 #### Boss map markers
 Real-time markers on the fullscreen map for each boss, color-coded (red=alive, grey=dead). A boss list overlay appears when the map is open. Toggleable from settings (ON by default).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Show hidden enemy health bars
 Forces health bars visible on enemies whose bar is hidden by default (e.g. the ??? boss). Toggleable from settings (ON by default).
