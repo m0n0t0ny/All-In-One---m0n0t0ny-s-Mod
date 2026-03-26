@@ -29,6 +29,8 @@ Zeigt den Verkaufspreis eines beliebigen Gegenstands jederzeit an, nicht nur in 
 #### Inventarzählung beim Hover
 Zeigt an, wie viele des angezeigten Gegenstands Sie bei sich tragen und wie viele sich in Ihrem Lager befinden. Über Einstellungen umschaltbar (standardmäßig EIN).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Schneller Gegenstandstransfer
 Alt+Klick oder Shift+Klick, um Gegenstände sofort zwischen einem geöffneten Behälter und Ihrem Rucksack zu verschieben, und umgekehrt.
 
@@ -43,7 +45,7 @@ Ein grünes Häkchen auf Schlüsseln und Blueprints, die Sie bereits aufgezeichn
 #### Lootbox-Hervorhebung
 Farbiger Umriss auf Beutebehältern in der Welt, damit Sie keinen verpassen. Drei Modi: Alle / Nur nicht durchsuchte / Deaktiviert. Die Randfarbe folgt der Seltenheit der Gegenstände (weiß für leere Behälter).
 
-![Lootbox-Hervorhebung](assets/lootbox-highlight.png)
+![Lootbox-Hervorhebung](assets/lootbox-highlight-coloured.png)
 
 #### Gegenstand-Seltenheitsanzeige
 Farbiger Rahmen auf Inventarplätzen basierend auf dem Verkaufswert der Gegenstände. Sechs Stufen von weiß (geringer Wert) bis rot (hoher Wert). Über Einstellungen umschaltbar.
@@ -67,6 +69,8 @@ Zeigt Kills in der oberen rechten Ecke während Überfällen an - Töter, Opfer 
 
 #### Boss-Kartenmarkierungen
 Echtzeit-Markierungen auf der Vollbildkarte für jeden Boss, farbcodiert (rot=lebendig, grau=tot). Eine Boss-Listen-Überlagerung erscheint, wenn die Karte geöffnet ist. Über Einstellungen umschaltbar (standardmäßig EIN).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Versteckte Feind-Lebensleisten anzeigen
 Erzwingt die Anzeige von Lebensleisten bei Feinden, deren Leiste standardmäßig verborgen ist (z. B. der ???-Boss). Über Einstellungen umschaltbar (standardmäßig EIN).

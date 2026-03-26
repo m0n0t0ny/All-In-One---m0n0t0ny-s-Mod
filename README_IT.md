@@ -29,6 +29,8 @@ Mostra il prezzo di vendita di qualsiasi oggetto in qualsiasi momento, non solo 
 #### Conteggio inventario al passaggio del cursore
 Mostra quanti oggetti del tipo indicato stai trasportando e quanti ne hai nella scorta. Attivabile/disattivabile dalle impostazioni (ON per impostazione predefinita).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Trasferimento rapido degli oggetti
 Alt+click o Shift+click per spostare istantaneamente gli oggetti tra un contenitore aperto e il tuo zaino, e viceversa.
 
@@ -43,7 +45,7 @@ Un segno di spunta verde sulle chiavi e sui blueprint già registrati, così sai
 #### Evidenziazione contenitori bottino
 Contorno colorato sui contenitori di bottino nel mondo in modo da non perderne nessuno. Tre modalità: Tutti / Solo non cercati / Disattivato. Il colore del bordo segue la rarità degli oggetti (bianco per i contenitori vuoti).
 
-![Evidenziazione lootbox](assets/lootbox-highlight.png)
+![Evidenziazione lootbox](assets/lootbox-highlight-coloured.png)
 
 #### Visualizzazione rarità oggetti
 Bordo colorato sugli slot dell'inventario in base al valore di vendita degli oggetti. Sei livelli dal bianco (basso valore) al rosso (alto valore). Attivabile/disattivabile dalle impostazioni.
@@ -67,6 +69,8 @@ Mostra le uccisioni nell'angolo in alto a destra durante le incursioni - uccisor
 
 #### Marcatori mappa boss
 Marcatori in tempo reale sulla mappa a schermo intero per ogni boss, con codice colore (rosso=vivo, grigio=morto). Un overlay con l'elenco dei boss appare quando la mappa è aperta. Attivabile/disattivabile dalle impostazioni (ON per impostazione predefinita).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Mostra barre della salute nascoste dei nemici
 Forza la visualizzazione delle barre della salute sui nemici la cui barra è nascosta per impostazione predefinita (es. il boss ???). Attivabile/disattivabile dalle impostazioni (ON per impostazione predefinita).

@@ -29,6 +29,8 @@ Muestra el precio de venta de cualquier objeto en cualquier momento, no solo en 
 #### Recuento de inventario al pasar el cursor
 Muestra cuántos del objeto señalado llevas encima y cuántos tienes en tu almacén. Activable desde los ajustes (activado por defecto).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Transferencia rápida de objetos
 Alt+clic o Shift+clic para mover objetos instantáneamente entre un contenedor abierto y tu mochila, y viceversa.
 
@@ -43,7 +45,7 @@ Una marca de verificación verde en las llaves y planos que ya has registrado, p
 #### Resaltado de cajas de botín
 Contorno de color en los contenedores de botín del mundo para que nunca se te pase ninguno. Tres modos: Todos / Solo no registrados / Desactivado. El color del borde sigue la rareza del objeto (blanco para contenedores vacíos).
 
-![Resaltado de lootbox](assets/lootbox-highlight.png)
+![Resaltado de lootbox](assets/lootbox-highlight-coloured.png)
 
 #### Visualización de rareza de objetos
 Borde de color en las ranuras del inventario según el valor de venta de los objetos. Seis niveles del blanco (bajo valor) al rojo (alto valor). Activable desde los ajustes.
@@ -67,6 +69,8 @@ Muestra las bajas en la esquina superior derecha durante las incursiones — ase
 
 #### Marcadores de jefes en el mapa
 Marcadores en tiempo real en el mapa a pantalla completa para cada jefe, con código de colores (rojo=vivo, gris=muerto). Aparece un panel con la lista de jefes cuando el mapa está abierto. Activable desde los ajustes (activado por defecto).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Mostrar barras de vida ocultas de enemigos
 Fuerza la visualización de barras de vida en enemigos cuya barra está oculta por defecto (p. ej., el jefe ???). Activable desde los ajustes (activado por defecto).

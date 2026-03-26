@@ -29,6 +29,8 @@ Affiche le prix de vente de n'importe quel objet à tout moment, pas seulement d
 #### Comptage d'inventaire au survol
 Affiche combien d'exemplaires de l'objet survolé vous transportez et combien se trouvent dans votre réserve. Activable depuis les paramètres (ON par défaut).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Transfert rapide d'objets
 Alt+clic ou Shift+clic pour déplacer instantanément des objets entre un conteneur ouvert et votre sac à dos, et vice versa.
 
@@ -43,7 +45,7 @@ Une coche verte sur les clés et les blueprints déjà enregistrés, pour savoir
 #### Mise en évidence des conteneurs de butin
 Contour coloré sur les conteneurs de butin dans le monde pour ne jamais en rater un. Trois modes : Tous / Seulement les non fouillés / Désactivé. La couleur du bord suit la rareté des objets (blanc pour les conteneurs vides).
 
-![Mise en évidence des lootbox](assets/lootbox-highlight.png)
+![Mise en évidence des lootbox](assets/lootbox-highlight-coloured.png)
 
 #### Affichage de la rareté des objets
 Bordure colorée sur les emplacements d'inventaire en fonction de la valeur de vente des objets. Six niveaux du blanc (faible valeur) au rouge (haute valeur). Activable depuis les paramètres.
@@ -67,6 +69,8 @@ Affiche les kills dans le coin supérieur droit pendant les raids - tueur, victi
 
 #### Marqueurs de carte des boss
 Marqueurs en temps réel sur la carte plein écran pour chaque boss, avec code couleur (rouge=vivant, gris=mort). Une superposition avec la liste des boss apparaît lorsque la carte est ouverte. Activable depuis les paramètres (ON par défaut).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Afficher les barres de vie cachées des ennemis
 Force l'affichage des barres de vie sur les ennemis dont la barre est cachée par défaut (ex. le boss ???). Activable depuis les paramètres (ON par défaut).

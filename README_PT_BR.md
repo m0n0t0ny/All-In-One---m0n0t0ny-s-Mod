@@ -29,6 +29,8 @@ Exibe o preço de venda de qualquer item a qualquer momento, não apenas nas loj
 #### Contagem de inventário ao passar o mouse
 Mostra quantos do item em foco você está carregando e quantos estão no seu armazém. Ativável nas configurações (ligado por padrão).
 
+![Inventory count on hover](assets/inventory-count-on-hover.png)
+
 #### Transferência rápida de itens
 Alt+clique ou Shift+clique para mover itens instantaneamente entre um contêiner aberto e sua mochila, e vice-versa.
 
@@ -43,7 +45,7 @@ Uma marca de verificação verde em chaves e plantas que você já registrou, pa
 #### Destaque de caixas de saque
 Contorno colorido em contêineres de saque no mundo para que você nunca perca nenhum. Três modos: Todos / Apenas não vasculhados / Desativado. A cor da borda segue a raridade do item (branco para contêineres vazios).
 
-![Destaque de lootbox](assets/lootbox-highlight.png)
+![Destaque de lootbox](assets/lootbox-highlight-coloured.png)
 
 #### Exibição de raridade de itens
 Borda colorida nos slots do inventário com base no valor de venda dos itens. Seis níveis do branco (baixo valor) ao vermelho (alto valor). Ativável nas configurações.
@@ -67,6 +69,8 @@ Mostra abates no canto superior direito durante as incursões — matador, víti
 
 #### Marcadores de chefes no mapa
 Marcadores em tempo real no mapa em tela cheia para cada chefe, com código de cores (vermelho=vivo, cinza=morto). Uma sobreposição com a lista de chefes aparece quando o mapa está aberto. Ativável nas configurações (ligado por padrão).
+
+![Boss map markers](assets/boss-map-markers.png)
 
 #### Mostrar barras de vida ocultas de inimigos
 Força a exibição das barras de vida em inimigos cuja barra está oculta por padrão (ex.: o chefe ???). Ativável nas configurações (ligado por padrão).
