@@ -15,7 +15,7 @@ Mod completo de qualidade de vida para **Escape from Duckov**. 20 funcionalidade
 
 ## Funcionalidades
 
-Todas as configurações são salvas e podem ser ajustadas pela aba **ALL IN ONE** no menu de Configurações do jogo — acessível tanto pelo menu principal quanto pelo menu de pausa no jogo.
+Todas as configurações são salvas e podem ser ajustadas pela aba **ALL IN ONE** no menu de Configurações do jogo - acessível tanto pelo menu principal quanto pelo menu de pausa no jogo.
 
 ![Menu de opções](assets/f9-menu.png)
 
@@ -37,7 +37,7 @@ Mostra quantos do item em foco você está carregando e quantos estão no seu ar
 Alt+clique ou Shift+clique para mover itens instantaneamente entre um contêiner aberto e sua mochila, e vice-versa.
 
 #### Descarregar arma automaticamente ao matar
-Ao saquear um inimigo abatido, a arma dele é descarregada automaticamente — a munição vai direto para o armazém como uma pilha coletável, pronta para ser pega.
+Ao saquear um inimigo abatido, a arma dele é descarregada automaticamente - a munição vai direto para o armazém como uma pilha coletável, pronta para ser pega.
 
 #### Emblema em chaves e Blueprints registrados
 Uma marca de verificação verde em chaves e plantas que você já registrou, para saber de relance o que guardar e o que vender.
@@ -67,7 +67,7 @@ Exibe o nome do inimigo acima da barra de vida.
 ![Nomes de inimigos](assets/enemy-names.png)
 
 #### Feed de abates
-Mostra abates no canto superior direito durante as incursões — matador, vítima e tag [HS] em headshots.
+Mostra abates no canto superior direito durante as incursões - matador, vítima e tag [HS] em headshots.
 
 #### Marcadores de chefes no mapa
 Marcadores em tempo real no mapa em tela cheia para cada chefe, com código de cores (vermelho=vivo, cinza=morto). Uma sobreposição com a lista de chefes aparece quando o mapa está aberto. Ativável nas configurações (ligado por padrão).
@@ -125,13 +125,13 @@ Pressione N em uma missão selecionada para fixá-la no topo da lista. Missões 
 
 A maioria dos recursos é orientada por eventos e não tem impacto mensurável no desempenho. Alguns realizam varreduras periódicas da cena que podem causar pequenas travadas em hardware menos potente. Se você experimentar quedas de framerate, tente desativar esses recursos primeiro, em ordem de impacto:
 
-| Recurso | Picos/sessão | Pico médio | Sobrecarga total | % |
-|---|---|---|---|---|
-| Mostrar barras de vida ocultas de inimigos | 32 | ~24ms | ~768ms | 34% |
-| Exibição de raridade de itens | 43 | ~13ms | ~559ms | 25% |
-| Destaque de caixas de saque | 32 | ~14ms | ~448ms | 20% |
-| Mostrar nome do inimigo | 32 | ~13ms | ~416ms | 18% |
-| Marcadores de chefes no mapa | 5 | ~15ms | ~75ms | 3% |
+| Recurso                                    | Picos/sessão | Pico médio | Sobrecarga total | %   |
+| ------------------------------------------ | ------------ | ---------- | ---------------- | --- |
+| Mostrar barras de vida ocultas de inimigos | 32           | ~24ms      | ~768ms           | 34% |
+| Exibição de raridade de itens              | 43           | ~13ms      | ~559ms           | 25% |
+| Destaque de caixas de saque                | 32           | ~14ms      | ~448ms           | 20% |
+| Mostrar nome do inimigo                    | 32           | ~13ms      | ~416ms           | 18% |
+| Marcadores de chefes no mapa               | 5            | ~15ms      | ~75ms            | 3%  |
 
 ---
 

@@ -15,7 +15,7 @@ Mod de calidad de vida todo en uno para **Escape from Duckov**. 20 funciones ind
 
 ## Funciones
 
-Todos los ajustes se guardan y son configurables desde la pestaña **ALL IN ONE** en el menú de Ajustes del juego — accesible tanto desde el menú principal como desde el menú de pausa en partida.
+Todos los ajustes se guardan y son configurables desde la pestaña **ALL IN ONE** en el menú de Ajustes del juego - accesible tanto desde el menú principal como desde el menú de pausa en partida.
 
 ![Menú de opciones](assets/f9-menu.png)
 
@@ -37,7 +37,7 @@ Muestra cuántos del objeto señalado llevas encima y cuántos tienes en tu alma
 Alt+clic o Shift+clic para mover objetos instantáneamente entre un contenedor abierto y tu mochila, y viceversa.
 
 #### Descarga automática del arma al matar
-Cuando saqueas a un enemigo abatido, su arma se descarga automáticamente — la munición va directamente al almacén como una pila recogible, lista para tomar.
+Cuando saqueas a un enemigo abatido, su arma se descarga automáticamente - la munición va directamente al almacén como una pila recogible, lista para tomar.
 
 #### Insignia en llaves y Blueprints registrados
 Una marca de verificación verde en las llaves y planos que ya has registrado, para saber de un vistazo qué conservar y qué vender.
@@ -67,7 +67,7 @@ Muestra el nombre del enemigo sobre su barra de vida.
 ![Nombres de enemigos](assets/enemy-names.png)
 
 #### Feed de bajas
-Muestra las bajas en la esquina superior derecha durante las incursiones — asesino, víctima y etiqueta [HS] en disparos a la cabeza.
+Muestra las bajas en la esquina superior derecha durante las incursiones - asesino, víctima y etiqueta [HS] en disparos a la cabeza.
 
 #### Marcadores de jefes en el mapa
 Marcadores en tiempo real en el mapa a pantalla completa para cada jefe, con código de colores (rojo=vivo, gris=muerto). Aparece un panel con la lista de jefes cuando el mapa está abierto. Activable desde los ajustes (activado por defecto).
@@ -125,13 +125,13 @@ Pulsa N en una misión seleccionada para fijarla en la parte superior de la list
 
 La mayoría de las funciones están basadas en eventos y no tienen un impacto medible en el rendimiento. Algunas realizan análisis periódicos de la escena que pueden causar breves stutters en hardware menos potente. Si experimentas caídas de framerate, intenta desactivar estas funciones primero, en orden de impacto:
 
-| Función | Picos/sesión | Pico promedio | Sobrecarga total | % |
-|---|---|---|---|---|
-| Mostrar barras de vida ocultas de enemigos | 32 | ~24ms | ~768ms | 34% |
-| Visualización de rareza de objetos | 43 | ~13ms | ~559ms | 25% |
-| Resaltado de cajas de botín | 32 | ~14ms | ~448ms | 20% |
-| Mostrar el nombre del enemigo | 32 | ~13ms | ~416ms | 18% |
-| Marcadores de jefes en el mapa | 5 | ~15ms | ~75ms | 3% |
+| Función                                    | Picos/sesión | Pico promedio | Sobrecarga total | %   |
+| ------------------------------------------ | ------------ | ------------- | ---------------- | --- |
+| Mostrar barras de vida ocultas de enemigos | 32           | ~24ms         | ~768ms           | 34% |
+| Visualización de rareza de objetos         | 43           | ~13ms         | ~559ms           | 25% |
+| Resaltado de cajas de botín                | 32           | ~14ms         | ~448ms           | 20% |
+| Mostrar el nombre del enemigo              | 32           | ~13ms         | ~416ms           | 18% |
+| Marcadores de jefes en el mapa             | 5            | ~15ms         | ~75ms            | 3%  |
 
 ---
 
