@@ -2,7 +2,7 @@
 
 English | [Italiano](README_IT.md) | [Français](README_FR.md) | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Português](README_PT_BR.md) | [Русский](README_RU.md) | [Español](README_ES.md)
 
-All-in-one quality of life mod for **Escape from Duckov**. 20 independent features, all configurable from the native **Settings** menu.
+All-in-one quality of life mod for **Escape from Duckov**. 22 independent features, all configurable from the native **Settings** menu.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -56,6 +56,12 @@ Colored border on inventory slots based on item sell value. Six tiers from white
 
 #### Item name label
 Item names on inventory slots are centered and shown without background label.
+
+#### Black market base price
+Shows the base price and percentage difference on each Black Market card. Offers that benefit the player are highlighted in green, those that don't in red. Toggleable from settings (ON by default).
+
+#### Sort by value (sort button)
+Replaces the inventory sort button with a 4-mode cycle: Native / Value / Stack value / Value per kg. Toggleable from settings (ON by default).
 
 ---
 

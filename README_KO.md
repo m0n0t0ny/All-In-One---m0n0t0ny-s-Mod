@@ -2,7 +2,7 @@
 
 [English](README.md) | [Italiano](README_IT.md) | [Français](README_FR.md) | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | 한국어 | [Português](README_PT_BR.md) | [Русский](README_RU.md) | [Español](README_ES.md)
 
-**Escape from Duckov**를 위한 올인원 삶의 질 향상 모드. 20개의 독립적인 기능이 모두 기본 **설정** 메뉴에서 구성 가능합니다.
+**Escape from Duckov**를 위한 올인원 삶의 질 향상 모드. 22개의 독립적인 기능이 모두 기본 **설정** 메뉴에서 구성 가능합니다.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -56,6 +56,12 @@ Alt+클릭 또는 Shift+클릭으로 열린 컨테이너와 배낭 사이에서 
 
 #### 아이템 이름 레이블
 인벤토리 슬롯의 아이템 이름은 가운데 정렬되고 배경 레이블 없이 표시됩니다.
+
+#### 암시장 기본 가격
+각 암시장 카드에 기본 가격과 비율 차이를 표시합니다. 플레이어에게 유리한 거래는 초록색, 불리한 거래는 빨간색으로 강조됩니다. 설정에서 전환 가능 (기본값: 켜짐).
+
+#### 가치별 정렬 (정렬 버튼)
+인벤토리 정렬 버튼을 4가지 모드 사이클로 교체합니다: 기본 / 가치 / 스택 가치 / kg당 가치. 설정에서 전환 가능 (기본값: 켜짐).
 
 ---
 

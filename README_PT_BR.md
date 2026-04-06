@@ -2,7 +2,7 @@
 
 [English](README.md) | [Italiano](README_IT.md) | [Français](README_FR.md) | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | Português | [Русский](README_RU.md) | [Español](README_ES.md)
 
-Mod completo de qualidade de vida para **Escape from Duckov**. 20 funcionalidades independentes, todas configuráveis pelo menu nativo de **Configurações**.
+Mod completo de qualidade de vida para **Escape from Duckov**. 22 funcionalidades independentes, todas configuráveis pelo menu nativo de **Configurações**.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -56,6 +56,12 @@ Borda colorida nos slots do inventário com base no valor de venda dos itens. Se
 
 #### Rótulo de nome do item
 Os nomes dos itens nos slots do inventário são centralizados e exibidos sem rótulo de fundo.
+
+#### Preço base do mercado negro
+Exibe o preço base e a diferença percentual em cada carta do Mercado Negro. Ofertas vantajosas para o jogador são destacadas em verde, as desvantajosas em vermelho. Ativável nas configurações (ligado por padrão).
+
+#### Ordenar por valor (botão de ordenar)
+Substitui o botão de ordenar do inventário por um ciclo de 4 modos: Nativo / Valor / Valor da pilha / Valor por kg. Ativável nas configurações (ligado por padrão).
 
 ---
 

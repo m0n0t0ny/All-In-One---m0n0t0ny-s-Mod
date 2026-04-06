@@ -2,7 +2,7 @@
 
 [English](README.md) | [Italiano](README_IT.md) | Français | [Deutsch](README_DE.md) | [中文简体](README_ZH_CN.md) | [中文繁體](README_ZH_TW.md) | [日本語](README_JA.md) | [한국어](README_KO.md) | [Português](README_PT_BR.md) | [Русский](README_RU.md) | [Español](README_ES.md)
 
-Mod de qualité de vie tout-en-un pour **Escape from Duckov**. 20 fonctionnalités indépendantes, toutes configurables depuis le menu **Paramètres** natif.
+Mod de qualité de vie tout-en-un pour **Escape from Duckov**. 22 fonctionnalités indépendantes, toutes configurables depuis le menu **Paramètres** natif.
 
 [![Steam Workshop](https://img.shields.io/badge/Steam%20Workshop-Subscribe-1b2838?logo=steam)](https://steamcommunity.com/sharedfiles/filedetails/?id=3685814781)
 [![Latest Release](https://img.shields.io/github/v/release/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod)](https://github.com/m0n0t0ny/All-In-One---m0n0t0ny-s-Mod/releases/latest)
@@ -56,6 +56,12 @@ Bordure colorée sur les emplacements d'inventaire en fonction de la valeur de v
 
 #### Étiquette de nom d'objet
 Les noms des objets dans les emplacements d'inventaire sont centrés et affichés sans étiquette de fond.
+
+#### Prix de base du marché noir
+Affiche le prix de base et l'écart en pourcentage sur chaque carte du Marché Noir. Les offres avantageuses pour le joueur sont surlignées en vert, celles qui ne le sont pas en rouge. Activable depuis les paramètres (ON par défaut).
+
+#### Tri par valeur (bouton de tri)
+Remplace le bouton de tri de l'inventaire par un cycle à 4 modes : Natif / Valeur / Valeur de pile / Valeur par kg. Activable depuis les paramètres (ON par défaut).
 
 ---
 
