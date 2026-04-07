@@ -1,6 +1,9 @@
 /.claude
 CLAUDE.md
 *.zip
-/duckov_modding/
+/duckov_modding/*
+!/duckov_modding/m0n0t0nysMod/
+/duckov_modding/m0n0t0nysMod/*
+!/duckov_modding/m0n0t0nysMod/ModBehaviour.cs
 Idee.md
 SteamWorkshopDescriptions.md
